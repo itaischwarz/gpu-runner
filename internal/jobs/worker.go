@@ -1,8 +1,9 @@
 package jobs
 
 import (
-    "fmt"
-    "time"
+	"fmt"
+	"gpu-runner/internal/executer"
+	"time"
 )
 
 type Worker struct {
@@ -22,9 +23,9 @@ func (w *Worker) Start() {
         for job := range w.JobQueue.Queue {
             job.Status = StatusRunning
             job.Log = fmt.Sprintf("Worker %d: Executing %s\n", w.ID, job.Command)
-
+            executer.RunCommand(job.Command, job.ID)
             // Simulate GPU job duration
-            time.Sleep(3 * time.Second)
+            time.Sleep(1 * time.Second)
 
             job.Status = StatusSuccess
             job.Log += "Completed.\n"
