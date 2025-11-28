@@ -4,12 +4,12 @@ import "time"
 
 type JobStatus string
 
-const (
-    StatusPending  JobStatus = "pending"
-    StatusRunning  JobStatus = "running"
-    StatusSuccess  JobStatus = "success"
-    StatusFailed   JobStatus = "failed"
-)
+
+
+
+type JobStorage int
+
+
 
 type Job struct {
     ID        string     `json:"id"`
@@ -17,4 +17,8 @@ type Job struct {
     Status    JobStatus  `json:"status"`
     Log       string     `json:"log"`
     CreatedAt time.Time  `json:"created_at"`
+    StorageBytes   JobStorage `json:"storage"`
+    VolumePath string    `json:"volume_path"`
+    StartedAt string     `json:"started_at"`
+    FinishedAt string    `json:"finished_at"`
 }
