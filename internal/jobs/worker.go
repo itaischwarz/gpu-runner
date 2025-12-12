@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"context"
 	"fmt"
 	"gpu-runner/internal/executer"
 	"time"
@@ -24,12 +25,16 @@ func (w *Worker) Start() {
             job.Status = StatusRunning
             job.Log = fmt.Sprintf("Worker %d: Executing %s\n", w.ID, job.Command)
             volumePath := VolumePaths[job.StorageBytes]
-            executer.RunCommand(job.Command, job.ID, volumePath)
+            ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+            w.JobQueue.Executor.SetCancelFunc(job.ID, cancel)
+            w.JobQueue.Executor.RunJob(job.Command, job.ID, volumePath, &ctx)
             // Simulate GPU job duration
             time.Sleep(1 * time.Second)
 
             job.Status = StatusSuccess
             job.Log += "Completed.\n"
+            logger := job.Logger 
+            logger.Info(job.Log)
         }
     }()
 }

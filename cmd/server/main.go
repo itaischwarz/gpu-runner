@@ -11,7 +11,7 @@ import (
 
 func main() {
     jobQueue := jobs.NewJobQueue(10)
-    js, err := store.NewJobStore("/tmp/gpu-runner/jobs.db")
+    js, err := store.NewJobStore("/Users/itaischwarz/projects/gpu-runner/jobs.db")
     if err != nil {
         log.Fatalf("Unable to create Job")
     }

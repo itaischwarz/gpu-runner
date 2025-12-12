@@ -1,7 +1,9 @@
 package jobs
 
-import "time"
-
+import (
+"time"
+"log/slog"
+)
 type JobStatus string
 
 
@@ -16,6 +18,7 @@ type Job struct {
     Command   string     `json:"command"`
     Status    JobStatus  `json:"status"`
     Log       string     `json:"log"`
+    Logger    *slog.Logger `json:"logger"`
     CreatedAt time.Time  `json:"created_at"`
     StorageBytes   JobStorage `json:"storage"`
     VolumePath string    `json:"volume_path"`

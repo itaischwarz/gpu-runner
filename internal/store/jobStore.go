@@ -37,10 +37,11 @@ func NewJobStore(path string) (*JobStore, error) {
 		}
 		js := &JobStore{DB: db}
 		
-		if err := js.initSchema(); err == nil{
+		if err := js.initSchema(); err != nil{
 			logger.Error("DB Schema resulted in an error", "error", err)
 		}
-		logger.Info("Succesfully Created DB")
+		log := fmt.Sprintf("Succesfully Created DB in %s", path)
+		logger.Info(log)
 		return js, nil
 
 
@@ -68,19 +69,19 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 func (s *JobStore) CreateJob(j *jobs.Job) error {
 
-		if j.ID == "" || j.Command == "" {
-			return fmt.Errorf("job missing required fields")
+		// if j.ID == "" || j.Command == "" {
+		// 	return fmt.Errorf("job missing required fields")
 
-		}
+		// }
 		if j.CreatedAt.IsZero() {
         j.CreatedAt = time.Now()
     }
 
+
 		result, err := s.DB.Exec(
 			`INSERT INTO jobs 
-			(id, command, status, log, storage_bytes, volume_path, created_at, started_at, finished_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			j.ID,
+			(command, status, log, storage_bytes, volume_path, created_at, started_at, finished_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			j.Command,
 			string(j.Status),
 			j.Log,	
@@ -89,22 +90,34 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 			j.CreatedAt,
 			j.StartedAt,
 			j.FinishedAt,
-	)
-	lastId, err := result.LastInsertId()
-	j.ID = fmt.Sprintf("%d", lastId)
-	if err != nil {
-		logger.Error("unable to create job", "Error", err)
-	} else {
-		logger.Info("Succesfully Created Job!")
-	}
+		)
+
+		if err != nil{
+			logger.Error("unable to create job", "Error", err)
+		}
+		lastId, err := result.LastInsertId()
+		if err != nil {
+			logger.Error("unable to fetch id", "Error", err)
+		}
+		j.ID = fmt.Sprintf("%d", lastId)
+
+		
+
+		
 
 	
 
-		return err
+		
+		fmt.Println("Error: ", err)
+
+
+	
+
+	return err
 
 }
 
-func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
+func (s *JobStore) GetJob(id string ) (*jobs.Job, error) {
 
 
 	
@@ -126,11 +139,22 @@ func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
         &j.FinishedAt,
     )
     if err != nil {
-			 logger.Error("unable to get job", "Error", err)
 
        return nil, err
     }
     j.Status = jobs.JobStatus(status)
     return &j, nil
 
+}
+
+func (s *JobStore) CancelJob(id string ) (*jobs.Job, error){
+	job, err := s.GetJob(id)
+	if err != nil {
+		return nil, err
+	}
+	if job.Status != jobs.StatusPending && job.Status  != jobs.StatusRunning{
+		return nil, fmt.Errorf("job cannot be cancelled: status is %s", job.Status)
+	} 
+	job.Status =  jobs.StatusCancelled
+	return job, nil
 }

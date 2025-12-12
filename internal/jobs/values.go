@@ -15,8 +15,9 @@ var VolumePaths = map[JobStorage] string{
 
 
 const (
-    StatusPending  JobStatus = "pending"
-    StatusRunning  JobStatus = "running"
-    StatusSuccess  JobStatus = "success"
-    StatusFailed   JobStatus = "failed"
+    StatusPending   JobStatus = "pending"
+    StatusRunning   JobStatus = "running"
+    StatusSuccess   JobStatus = "success"
+    StatusFailed    JobStatus = "failed"
+    StatusCancelled JobStatus = "cancelled"
 )

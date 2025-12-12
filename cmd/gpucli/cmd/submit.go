@@ -15,22 +15,24 @@ var submitCmd = &cobra.Command{
     Short: "Submit a GPU job",
     Run: func(cmd *cobra.Command, args []string) {
         command, _ := cmd.Flags().GetString("cmd")
-
-
         body := map[string]string{"command": command}
-
         fmt.Println("Body at start", body)
-
         data, _ := json.Marshal(body)
 
-        resp, _ := http.Post("http://localhost:8080/jobs", "application/json", bytes.NewBuffer(data))
+        resp, err := http.Post("http://localhost:8080/jobs", "application/json", bytes.NewBuffer(data))
+
+        if err != nil {
+            fmt.Println("Error: ", err)
+            return
+        }
 
         bodyBytes, _ := io.ReadAll(resp.Body)
 
         fmt.Println("RAW RESPONSE BODY:\n", string(bodyBytes))
 
         var job map[string]interface{}
-        err := json.Unmarshal(bodyBytes, &job)
+
+        err = json.Unmarshal(bodyBytes, &job)
     
         resp.Body.Close()
 
@@ -38,7 +40,8 @@ var submitCmd = &cobra.Command{
             fmt.Println("Unable to extract body contents", err)
         }
 
-        fmt.Println("job submitted:", job["id"])
+        // fmt.Println("Job submit",job)
+        // fmt.Println("job submitted:", job["id"])
     },
 }
 
