@@ -15,10 +15,10 @@ var submitCmd = &cobra.Command{
     Short: "Submit a GPU job",
     Run: func(cmd *cobra.Command, args []string) {
         command, _ := cmd.Flags().GetString("cmd")
-        body := map[string]string{"command": command}
+        storage, _ := cmd.Flags().GetString("storage")
+        body := map[string]string{"command": command, "storage": storage}
         fmt.Println("Body at start", body)
         data, _ := json.Marshal(body)
-
         resp, err := http.Post("http://localhost:8080/jobs", "application/json", bytes.NewBuffer(data))
 
         if err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"gpu-runner/internal/api"
 	"gpu-runner/internal/jobs"
@@ -20,9 +21,10 @@ func main() {
 
 
     // Start workers
+    ctx := context.Background()
     for i := 1; i <= 3; i++ {
         worker := jobs.NewWorker(i, jobQueue)
-        worker.Start()
+        worker.Start(ctx)
     }
 
     handlers := api.NewHandlers(jobQueue, js)
