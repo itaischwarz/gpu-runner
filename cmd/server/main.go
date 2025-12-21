@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gpu-runner/internal/api"
+	"gpu-runner/internal/executer"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/store"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 func main() {
     jobQueue := jobs.NewJobQueue(10)
+    jobQueue.Executor = executer.NewExecutor()
     js, err := store.NewJobStore("/Users/itaischwarz/projects/gpu-runner/jobs.db")
     if err != nil {
         log.Fatalf("Unable to create Job")

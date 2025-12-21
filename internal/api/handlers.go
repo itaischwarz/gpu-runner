@@ -80,17 +80,25 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) CancelJob(w http.ResponseWriter, r *http.Request){
     id := mux.Vars(r)["id"]
     var body struct{
-        reason string
+        Reason string `json:"reason"`
     }
-    json.NewDecoder(r.Body).Decode(&body)
-    reason := body.reason
+    _ = json.NewDecoder(r.Body).Decode(&body)
+    reason := body.Reason
+
+    if err := h.Queue.Executor.CancelJob(id); err != nil {
+        ServerLogger.Error("Unable to cancel running job", "error", err, "job", id)
+    }
+
     job, err := h.JobStore.CancelJob(id)
     if err != nil {
-        job.Logger.Error("Unable to Cancel Job", "error", err)
+        ServerLogger.Error("Unable to cancel job in store", "error", err, "job", id)
+        http.Error(w, "job not cancellable", http.StatusBadRequest)
+        return
+    }
+    if job.Logger == nil {
+        job.Logger = logger.CreateJobLogger(job.ID)
     }
     job.Logger.Info("Succesfully Cancelled Job!", "reason", reason)
-
-    h.Queue.Enqueue(job)
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(job)
@@ -98,6 +106,12 @@ func (h *Handlers) CancelJob(w http.ResponseWriter, r *http.Request){
 
 func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
     id := mux.Vars(r)["id"]
+
+    fmt.Printf("Type: %T\n", id)
+
+    // fmt.Println("id"  id)
+    // fmt.Println("id:", mux.Vars(r)["id"])
+
     job, err := h.JobStore.GetJob(id)
     if err != nil {
         ServerLogger.Error("Failed to Fetch job",  "error" , err)
@@ -107,4 +121,3 @@ func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
 
     json.NewEncoder(w).Encode(job)
 }
-

@@ -6,41 +6,44 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
 var Server *slog.Logger
 
-
-
 func init() {
-    serverPath, err := os.OpenFile("/Users/itaischwarz/log/gpu-runner/server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	baseDir := filepath.Join("~", "log", "gpu-runner")
+	_ = os.MkdirAll(baseDir, 0o755)
 
-    if err != nil {
-        log.Fatalf("failed to open server log: %v", err)
-    }
+	serverPath, err := os.OpenFile(filepath.Join(baseDir, "server.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		log.Fatalf("failed to open server log: %v", err)
+	}
 
-    handler := slog.NewTextHandler(
-        io.MultiWriter(os.Stdout, serverPath),
-        &slog.HandlerOptions{Level: slog.LevelInfo},
-    )
+	handler := slog.NewTextHandler(
+		io.MultiWriter(os.Stdout, serverPath),
+		&slog.HandlerOptions{Level: slog.LevelInfo},
+	)
 
-
-
-    Server = slog.New(handler)
-
+	Server = slog.New(handler)
 }
-func CreateJobLogger(job_id string) *slog.Logger {
-    jobPath, err := os.OpenFile(fmt.Sprintf("/Users/itaischwarz/log/gpu-runner/job%s.log", job_id), os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0644)
 
-    if err != nil {
-        log.Fatalf("Unable to open job log: job %s", job_id)
+func CreateJobLogger(jobID string) *slog.Logger {
+    home, err := os.UserHomeDir()
+    if err != nil{
+        Server.Error("Unable to open home directory ")
     }
+	baseDir := filepath.Join(home, "log", "gpu-runner")
+	_ = os.MkdirAll(baseDir, 0o755)
+	jobPath, err := os.OpenFile(filepath.Join(baseDir, fmt.Sprintf("job%s.log", jobID)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		log.Fatalf("Unable to open job log: job %s", jobID)
+	}
 
-    handler := slog.NewJSONHandler(
-        io.MultiWriter(os.Stdout, jobPath),
-        &slog.HandlerOptions{Level: slog.LevelInfo},
-    )
+	handler := slog.NewJSONHandler(
+		io.MultiWriter(os.Stdout, jobPath),
+		&slog.HandlerOptions{Level: slog.LevelInfo},
+	)
 
-    return slog.New(handler)
-
+	return slog.New(handler)
 }

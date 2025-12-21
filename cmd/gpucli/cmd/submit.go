@@ -6,48 +6,51 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 var submitCmd = &cobra.Command{
-    Use:   "submit",
-    Short: "Submit a GPU job",
-    Run: func(cmd *cobra.Command, args []string) {
-        command, _ := cmd.Flags().GetString("cmd")
-        storage, _ := cmd.Flags().GetString("storage")
-        body := map[string]string{"command": command, "storage": storage}
-        fmt.Println("Body at start", body)
-        data, _ := json.Marshal(body)
-        resp, err := http.Post("http://localhost:8080/jobs", "application/json", bytes.NewBuffer(data))
+	Use:   "submit",
+	Short: "Submit a GPU job",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		command, _ := cmd.Flags().GetString("cmd")
+		storage, _ := cmd.Flags().GetString("storage")
+		body := map[string]string{"command": command, "storage": storage}
+		data, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("encode request: %w", err)
+		}
 
-        if err != nil {
-            fmt.Println("Error: ", err)
-            return
-        }
+		base := strings.TrimRight(server, "/")
+		resp, err := http.Post(base+"/jobs", "application/json", bytes.NewBuffer(data))
+		if err != nil {
+			return fmt.Errorf("submit request failed: %w", err)
+		}
+		defer resp.Body.Close()
 
-        bodyBytes, _ := io.ReadAll(resp.Body)
+		payload, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode >= 300 {
+			return fmt.Errorf("submit failed (%s): %s", resp.Status, strings.TrimSpace(string(payload)))
+		}
 
-        fmt.Println("RAW RESPONSE BODY:\n", string(bodyBytes))
+		var job struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		}
+		if err := json.Unmarshal(payload, &job); err != nil {
+			return fmt.Errorf("parse response: %w", err)
+		}
 
-        var job map[string]interface{}
-
-        err = json.Unmarshal(bodyBytes, &job)
-    
-        resp.Body.Close()
-
-        if err != nil{
-            fmt.Println("Unable to extract body contents", err)
-        }
-
-        // fmt.Println("Job submit",job)
-        // fmt.Println("job submitted:", job["id"])
-    },
+		fmt.Printf("Job submitted: %s (status: %s)\n", job.ID, job.Status)
+		return nil
+	},
 }
 
 func init() {
-    submitCmd.Flags().String("cmd", "", "Command to run")
-    submitCmd.MarkFlagRequired("cmd")
-    submitCmd.Flags().String("storage", "", "Storage for Job")
-    rootCmd.AddCommand(submitCmd)
+	submitCmd.Flags().String("cmd", "", "Command to run")
+	submitCmd.MarkFlagRequired("cmd")
+	submitCmd.Flags().String("storage", "", "Storage for Job")
+	rootCmd.AddCommand(submitCmd)
 }

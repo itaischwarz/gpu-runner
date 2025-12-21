@@ -1,0 +1,14 @@
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  golangci:
+    name: Lint Go Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        run: actions/checkout@6
+      - name: Lint Go
+        run: golangci/golangci-lint

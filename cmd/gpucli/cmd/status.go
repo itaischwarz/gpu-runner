@@ -3,44 +3,50 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 var statusCmd = &cobra.Command{
-    Use:   "status [jobID]",
-    Short: "Check job status",
-    Args:  cobra.ExactArgs(1),
-    Run: func(cmd *cobra.Command, args []string) {
-        jobID := args[0]
+	Use:   "status [jobID]",
+	Short: "Check job status",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		jobID := args[0]
 
-        resp, _ := http.Get("http://localhost:8080/jobs/" + jobID)
+		base := strings.TrimRight(server, "/")
+		resp, err := http.Get(base + "/jobs/" + jobID)
 
-        if resp.StatusCode != 200 {
-            fmt.Println("Job not found")
-            return
-        }
+		if err != nil {
+            fmt.Print("Failed sending to this url",base + "/jobs/" + jobID)
+			return fmt.Errorf("status request failed: %w", err)
+		}
+		defer resp.Body.Close()
 
-        bodyBytes, err := json.Marshal(resp.Body)
-        if err != nil{
-            fmt.Println("Unable to Extract Respones Status Body")
-        }
+		payload, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode >= 300 {
+			return fmt.Errorf("status failed (%s): %s", resp.Status, strings.TrimSpace(string(payload)))
+		}
 
+		var job struct {
+			ID      string `json:"id"`
+			Status  string `json:"status"`
+			Log     string `json:"log"`
+			Command string `json:"command"`
+		}
 
-        fmt.Println("RAW RESPONSE BODY:\n", string(bodyBytes))
+		if err := json.Unmarshal(payload, &job); err != nil {
+			return fmt.Errorf("parse response: %w", err)
+		}
 
-        var job map[string]interface{}
-        if err := json.Unmarshal(bodyBytes, &job); err != nil{
-            fmt.Println("Unable to Unmarshall JSON Status Body data ")
-        }
-
-        json.NewDecoder(resp.Body).Decode(&job)
-
-        fmt.Printf("Status: %s\nLogs:\n%s\n", job["status"], job["log"])
-    },
+		fmt.Printf("Job: %s\nCommand: %s\nStatus: %s\nLogs:\n%s\n", job.ID, job.Command, job.Status, job.Log)
+		return nil
+	},
 }
 
 func init() {
-    rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(statusCmd)
 }
