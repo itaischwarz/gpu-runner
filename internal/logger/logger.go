@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -28,22 +27,3 @@ func init() {
 	Server = slog.New(handler)
 }
 
-func CreateJobLogger(jobID string) *slog.Logger {
-    home, err := os.UserHomeDir()
-    if err != nil{
-        Server.Error("Unable to open home directory ")
-    }
-	baseDir := filepath.Join(home, "log", "gpu-runner")
-	_ = os.MkdirAll(baseDir, 0o755)
-	jobPath, err := os.OpenFile(filepath.Join(baseDir, fmt.Sprintf("job%s.log", jobID)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		log.Fatalf("Unable to open job log: job %s", jobID)
-	}
-
-	handler := slog.NewJSONHandler(
-		io.MultiWriter(os.Stdout, jobPath),
-		&slog.HandlerOptions{Level: slog.LevelInfo},
-	)
-
-	return slog.New(handler)
-}

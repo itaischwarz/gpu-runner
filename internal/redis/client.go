@@ -4,21 +4,49 @@ import (
 	"context"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"gpu-runner/internal/logger"
+	"time"
+	
 )
 
 
-func main() {
-	client := redis.NewClient(&redis.Options{
+type Client struct {
+	rdb *redis.Client
+}
+
+t
+
+
+
+
+
+func New()(*Client, error) {
+	rdb := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 		Password: "",
 		DB: 0,
-		Protocol: 2,
+		DialTimeout: 5 * time.Second,
+		ReadTimeout: 3 * time.Second,
+		WriteTimeout: 3 * time.Second,
+		MaxRetries: 3,
 	})
-	ctx := context.Background()
-	err := client.Set(ctx, "foo", "bar", 0).Err()
-	if err != nil {
-		panic(err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("redis unavaialable: %w", err)
 	}
-	val, err := client.Get(ctx, "foo").Result()
-	fmt.Println("foo ", val)
+
+	logger.Server.Info("✅ Redis connected")
+	return &Client{rdb: rdb}, nil
+
+}
+func (c *Client) Close() error {
+	logger.Server.Info("Closing Redis connection ...")
+	return c.rdb.Close()
+}
+
+func (c *Client) Raw() *redis.Client {
+	return c.rdb
 }

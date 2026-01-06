@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
+	"gpu-runner/internal/logger"
 )
 
 type Executor struct {
@@ -21,13 +21,9 @@ func NewExecutor() *Executor {
 	}
 }
 
-func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context) (string, error) {
+func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger) (string, error) {
 	defer e.RemoveCancelFunc(jobID)
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
-	logger1 := slog.New(slog.NewJSONHandler(
-		os.Stdout,
-	&slog.HandlerOptions{Level: slog.LevelDebug},
-	))
 
 	cmd.Dir = volumePath
 	cmd.Env = append(
@@ -47,19 +43,19 @@ func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context
 			exitCode = fmt.Sprintf("%d", ee.ExitCode())
 		}
 
-		logger1.Error("Unable to run job",
-			"err", err,
-			"exitCode", exitCode,
-			"command", command,
-			"dir", volumePath,
-			"stdout", stdout.String(),
-			"stderr", stderr.String(),
+		jobLogger.Error("Unable to run job",
+			logger.Item("err", err),
+			logger.Item("exitCode", exitCode),
+			logger.Item("command", command,),
+			logger.Item("dir", volumePath),
+			logger.Item("stdout", stdout.String()),
+			logger.Item("stderr", stderr.String()),
 		)
 
 		return output, fmt.Errorf("command failed (exit %s): %s\nstderr:\n%s", exitCode, command, stderr.String())
 	}
 	output := stdout.String() + stderr.String()
-	logger1.Info("Succesfully Ran Job", "command", command)
+	jobLogger.Info("Succesfully Ran Job",  logger.Item("command", command))
 	return output, nil
 
 }

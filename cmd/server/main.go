@@ -7,29 +7,30 @@ import (
 	"gpu-runner/internal/executer"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/store"
+	"gpu-runner/internal/redis"
 	"log"
 	"net/http"
 )
 
+
 func main() {
+    client, err := redis.New()
+    streamSink := redis.NewStreamSink(client)
     jobQueue := jobs.NewJobQueue(10)
     jobQueue.Executor = executer.NewExecutor()
     js, err := store.NewJobStore("/Users/itaischwarz/projects/gpu-runner/jobs.db")
     if err != nil {
         log.Fatalf("Unable to create Job")
     }
-
-
-
-
     // Start workers
     ctx := context.Background()
+    client.StartRedisAdapter(ctx, jobQueue, streamSink)
     for i := 1; i <= 3; i++ {
         worker := jobs.NewWorker(i, jobQueue)
         worker.Start(ctx)
     }
 
-    handlers := api.NewHandlers(jobQueue, js)
+    handlers := api.NewHandlers(jobQueue, js, ctx, streamSink, client)
     router := api.NewRouter(handlers)
 
     fmt.Println("Server running on :8080")

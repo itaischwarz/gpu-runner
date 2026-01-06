@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"gpu-runner/internal/jobs"
@@ -8,6 +9,8 @@ import (
 	"gpu-runner/internal/store"
 	"net/http"
 	"time"
+
+	"gpu-runner/internal/redis"
 
 	"github.com/gorilla/mux"
 )
@@ -17,12 +20,18 @@ var ServerLogger = logger.Server
 type Handlers struct {
     Queue     *jobs.JobQueue
     JobStore  *store.JobStore
+    ctx       context.Context
+    StreamSink    *redis.StreamSink 
+    Client        *redis.Client
 }
 
-func NewHandlers(queue *jobs.JobQueue, store *store.JobStore ) *Handlers {
+func NewHandlers(queue *jobs.JobQueue, store *store.JobStore, context context.Context, streamSink *redis.StreamSink, client *redis.Client) *Handlers {
     return &Handlers{
         Queue:    queue,
         JobStore:  store,
+        ctx: context,
+        StreamSink: streamSink,
+        Client: client,
     }
 }
 
@@ -66,13 +75,11 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
         ServerLogger.Error("Failed to create job", "error", err)
         return
     }
-    job.Logger =  logger.CreateJobLogger(job.ID)
-
+    job.Logger =  logger.NewJobLogger(h.ctx, job.ID, h.StreamSink)
     job.Logger.Info("Succesfully Created Job!")
+    h.Client.Enqueue(h.ctx, *job)
 
     
-    h.Queue.Enqueue(job)
-
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(job)
 }
@@ -96,9 +103,10 @@ func (h *Handlers) CancelJob(w http.ResponseWriter, r *http.Request){
         return
     }
     if job.Logger == nil {
-        job.Logger = logger.CreateJobLogger(job.ID)
+        job.Logger =  logger.NewJobLogger(h.ctx, job.ID, h.StreamSink)
     }
-    job.Logger.Info("Succesfully Cancelled Job!", "reason", reason)
+    job.Logger.Info("Succesfully Cancelled Job!", 
+            logger.Item("reason", reason))
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(job)

@@ -4,41 +4,39 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"gpu-runner/internal/jobs"
+	"gpu-runner/internal/logger"
 
 	_ "github.com/mattn/go-sqlite3"
+
 )
 
 type JobStore struct {
 	DB *sql.DB
 }
 
-var logger *slog.Logger
+var serverLogger *slog.Logger
 
 func init() {
-	logger = slog.New(slog.NewTextHandler(
-		os.Stdout,
-		&slog.HandlerOptions{Level: slog.LevelDebug},
-	))
+	serverLogger = logger.Server
 }
 
 func NewJobStore(path string) (*JobStore, error) {
 
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		logger.Error("Unable to Create Sqlite DB", "error", err)
+		serverLogger.Error("Unable to Create Sqlite DB", "error", err)
 		return nil, err
 	}
 	js := &JobStore{DB: db}
 
 	if err := js.initSchema(); err != nil {
-		logger.Error("DB Schema resulted in an error", "error", err)
+		serverLogger.Error("DB Schema resulted in an error", "error", err)
 	}
 	log := fmt.Sprintf("Succesfully Created DB in %s", path)
-	logger.Info(log)
+	serverLogger.Info(log)
 	return js, nil
 
 }
@@ -87,15 +85,13 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 	)
 
 	if err != nil {
-		logger.Error("unable to create job", "Error", err)
+		serverLogger.Error("unable to create job", "Error", err)
 	}
 	lastId, err := result.LastInsertId()
 	if err != nil {
-		logger.Error("unable to fetch id", "Error", err)
+		serverLogger.Error("unable to fetch id", "Error", err)
 	}
 	j.ID = fmt.Sprintf("%d", lastId)
-
-	fmt.Println("Error: ", err)
 
 	return err
 
