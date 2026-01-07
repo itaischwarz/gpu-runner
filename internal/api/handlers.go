@@ -40,7 +40,8 @@ func NewHandlers(queue *jobs.JobQueue, store *store.JobStore, context context.Co
 func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
     var body struct {
         Command string          `json:"command"`
-        Storage jobs.JobStorage `json:"storage"`   
+        Storage jobs.JobStorage `json:"storage"` 
+        MaxRetries int          `json:"max_retries"`  
     }
     fmt.Println("HERE")
 
@@ -61,12 +62,18 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
         }
     }
     
+    if body.MaxRetries == 0{
+        body.MaxRetries = 3
+    }
+
     job := &jobs.Job{
         Command:   body.Command,
         StorageBytes:   body.Storage,
         VolumePath: jobs.VolumePaths[body.Storage],
         Status:    jobs.StatusPending,
         CreatedAt: time.Now(),
+        MaxRetries: body.MaxRetries,
+        JobTrial: 1,
     }
 
     fmt.Printf("%+v\n", job)

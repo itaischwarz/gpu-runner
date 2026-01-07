@@ -17,7 +17,8 @@ var submitCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		command, _ := cmd.Flags().GetString("cmd")
 		storage, _ := cmd.Flags().GetString("storage")
-		body := map[string]string{"command": command, "storage": storage}
+		maxRetries, _ := cmd.Flags().GetString("maxRetries")
+		body := map[string]string{"command": command, "storage": storage, "max_retries":maxRetries}
 		data, err := json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("encode request: %w", err)
@@ -52,5 +53,7 @@ func init() {
 	submitCmd.Flags().String("cmd", "", "Command to run")
 	submitCmd.MarkFlagRequired("cmd")
 	submitCmd.Flags().String("storage", "", "Storage for Job")
+	submitCmd.Flags().String("maxRetries", "", "Attempts running a job")
+
 	rootCmd.AddCommand(submitCmd)
 }

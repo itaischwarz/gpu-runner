@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     command TEXT NOT NULL,
     status TEXT NOT NULL,
-    log TEXT,
     storage_bytes INTEGER,
     volume_path TEXT,
     created_at DATETIME,
@@ -72,11 +71,10 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 
 	result, err := s.DB.Exec(
 		`INSERT INTO jobs 
-			(command, status, log, storage_bytes, volume_path, created_at, started_at, finished_at)
+			(command, status, storage_bytes, volume_path, created_at, started_at, finished_at)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		j.Command,
 		string(j.Status),
-		j.Log,
 		j.StorageBytes,
 		j.VolumePath,
 		j.CreatedAt,
@@ -96,6 +94,8 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 	return err
 
 }
+
+
 
 func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 

@@ -107,6 +107,28 @@ func (c *Client) StartRedisAdapter(ctx context.Context, jobQueue *jobs.JobQueue,
 	return nil
 }
 
+func (c *Client) StartRedisAcknowledger(ctx context.Context, worker jobs.Worker)  {
+	go func(){
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case res := <- worker.Results:
+				switch res.Status{
+				case jobs.StatusSuccess:
+					c.Acknowledge(ctx, *res)
+				case jobs.StatusFailed:
+					if res.JobTrial == res.MaxRetries{
+						continue
+					}
+					res.JobTrial++
+					c.Enqueue(ctx, *res)
+			}
+		}
+	}
+	}()
+}
+
 		
 	
 

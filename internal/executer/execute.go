@@ -43,14 +43,6 @@ func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context
 			exitCode = fmt.Sprintf("%d", ee.ExitCode())
 		}
 
-		jobLogger.Error("Unable to run job",
-			logger.Item("err", err),
-			logger.Item("exitCode", exitCode),
-			logger.Item("command", command,),
-			logger.Item("dir", volumePath),
-			logger.Item("stdout", stdout.String()),
-			logger.Item("stderr", stderr.String()),
-		)
 
 		return output, fmt.Errorf("command failed (exit %s): %s\nstderr:\n%s", exitCode, command, stderr.String())
 	}

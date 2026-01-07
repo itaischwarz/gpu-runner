@@ -22,13 +22,18 @@ func main() {
     if err != nil {
         log.Fatalf("Unable to create Job")
     }
+    fmt.Print("CREATED JOB")
     // Start workers
     ctx := context.Background()
     client.StartRedisAdapter(ctx, jobQueue, streamSink)
+    results := make(chan *jobs.Job, 100)
     for i := 1; i <= 3; i++ {
-        worker := jobs.NewWorker(i, jobQueue)
+        worker := jobs.NewWorker(i, jobQueue, results)
         worker.Start(ctx)
+        
     }
+    client.StartRedisAcknowledger(ctx, results)
+
 
     handlers := api.NewHandlers(jobQueue, js, ctx, streamSink, client)
     router := api.NewRouter(handlers)
