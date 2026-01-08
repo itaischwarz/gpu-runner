@@ -60,19 +60,14 @@ CREATE TABLE IF NOT EXISTS jobs (
 }
 
 func (s *JobStore) CreateJob(j *jobs.Job) error {
-
-	// if j.ID == "" || j.Command == "" {
-	// 	return fmt.Errorf("job missing required fields")
-
-	// }
 	if j.CreatedAt.IsZero() {
 		j.CreatedAt = time.Now()
 	}
 
 	result, err := s.DB.Exec(
-		`INSERT INTO jobs 
+		`INSERT INTO jobs
 			(command, status, storage_bytes, volume_path, created_at, started_at, finished_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		j.Command,
 		string(j.Status),
 		j.StorageBytes,
@@ -83,24 +78,44 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 	)
 
 	if err != nil {
-		serverLogger.Error("unable to create job", "Error", err)
+		serverLogger.Error("Database insert failed", "error", err)
+		return err
 	}
+
 	lastId, err := result.LastInsertId()
 	if err != nil {
-		serverLogger.Error("unable to fetch id", "Error", err)
+		serverLogger.Error("Failed to retrieve last insert ID", "error", err)
+		return err
 	}
 	j.ID = fmt.Sprintf("%d", lastId)
 
-	return err
+	return nil
+}
 
+func (s *JobStore) UpdateJob(j *jobs.Job) error {
+	_, err := s.DB.Exec(
+		`UPDATE jobs
+		SET finished_at = ?, status = ?
+			WHERE id = ?`,
+		j.FinishedAt,
+		j.Status,
+		j.ID,
+	)
+
+	if err != nil {
+		serverLogger.Error("Database update failed", "error", err, "job_id", j.ID)
+		return err
+	}
+
+	return nil
 }
 
 
 
-func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 
+func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 	row := s.DB.QueryRow(
-		`SELECT id, command, status, log, storage_bytes, volume_path, created_at, started_at, finished_at
+		`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at
          FROM jobs WHERE id = ?`, id)
 
 	var j jobs.Job
@@ -109,7 +124,6 @@ func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 		&j.ID,
 		&j.Command,
 		&status,
-		&j.Log,
 		&j.StorageBytes,
 		&j.VolumePath,
 		&j.CreatedAt,
@@ -117,12 +131,11 @@ func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 		&j.FinishedAt,
 	)
 	if err != nil {
-
+		serverLogger.Error("Database query failed", "error", err, "job_id", id)
 		return nil, err
 	}
 	j.Status = jobs.JobStatus(status)
 	return &j, nil
-
 }
 
 func (s *JobStore) CancelJob(id string) (*jobs.Job, error) {
@@ -136,6 +149,7 @@ func (s *JobStore) CancelJob(id string) (*jobs.Job, error) {
 	job.Status = jobs.StatusCancelled
 	_, err = s.DB.Exec(`UPDATE jobs SET status = ?, finished_at = ? WHERE id = ?`, string(job.Status), time.Now(), id)
 	if err != nil {
+		serverLogger.Error("Failed to cancel job in database", "error", err, "job_id", id)
 		return nil, err
 	}
 	return job, nil
