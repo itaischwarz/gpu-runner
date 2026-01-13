@@ -6,6 +6,7 @@ import (
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
 	"gpu-runner/internal/store"
+	"io"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
 
 var ServerLogger = logger.Server
 
@@ -39,14 +41,23 @@ func NewHandlers(queue *jobs.JobQueue, store *store.JobStore, context context.Co
 func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
     ServerLogger.Info("Received create job request", "remote_addr", r.RemoteAddr)
 
+    // Read the raw body first for debugging
+    bodyBytes, err := io.ReadAll(r.Body)
+    if err != nil {
+        ServerLogger.Error("Failed to read request body", "error", err, "remote_addr", r.RemoteAddr)
+        http.Error(w, "failed to read request body", http.StatusBadRequest)
+        return
+    }
+    ServerLogger.Info("Raw request body", "body", string(bodyBytes), "remote_addr", r.RemoteAddr)
+
     var body struct {
         Command string          `json:"command"`
         Storage jobs.JobStorage `json:"storage"`
         MaxRetries int          `json:"max_retries"`
     }
 
-    if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-        ServerLogger.Error("Failed to decode request body", "error", err, "remote_addr", r.RemoteAddr)
+    if err := json.Unmarshal(bodyBytes, &body); err != nil {
+        ServerLogger.Error("Failed to decode request body", "error", err, "raw_body", string(bodyBytes), "remote_addr", r.RemoteAddr)
         http.Error(w, "invalid request body", http.StatusBadRequest)
         return
     }
@@ -183,6 +194,9 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 				return
 			case res := <- results:
 				ServerLogger.Info("Processing job result", "job_id", res.ID, "status", res.Status, "trial", res.JobTrial)
+                if err := h.JobStore.UpdateJob(res); err != nil {
+					ServerLogger.Error("Failed to update job", "error", err, "job_id", res.ID)
+				}
 				switch res.Status{
 				case jobs.StatusSuccess:
 					ServerLogger.Info("Acknowledging successful job", "job_id", res.ID)
@@ -192,9 +206,6 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 				case jobs.StatusFailed:
 					if res.JobTrial >= res.MaxRetries{
 						ServerLogger.Warn("Job exhausted all retries", "job_id", res.ID, "trials", res.JobTrial, "max_retries", res.MaxRetries)
-						if err := h.JobStore.UpdateJob(res); err != nil {
-							ServerLogger.Error("Failed to update failed job", "error", err, "job_id", res.ID)
-						}
 						continue
 					}
 					res.JobTrial++
@@ -204,9 +215,6 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 					}
                 default:
 					ServerLogger.Info("Updating job with status", "job_id", res.ID, "status", res.Status)
-                    if err := h.JobStore.UpdateJob(res); err != nil {
-						ServerLogger.Error("Failed to update job", "error", err, "job_id", res.ID)
-					}
 			}
 		}
 	}

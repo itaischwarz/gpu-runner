@@ -3,10 +3,10 @@ package redis
 import (
 	"context"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"gpu-runner/internal/logger"
 	"time"
-	
+
+	"github.com/redis/go-redis/v9"
 )
 
 
@@ -21,7 +21,7 @@ type Client struct {
 
 func New()(*Client, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: "redis:6379",
 		Password: "",
 		DB: 0,
 		DialTimeout: 5 * time.Second,
