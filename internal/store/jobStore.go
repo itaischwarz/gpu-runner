@@ -138,6 +138,39 @@ func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 	return &j, nil
 }
 
+func (s *JobStore) ListJobs(status string) ([]*jobs.Job, error) {
+	var rows *sql.Rows
+	var err error
+
+	if status != "" {
+		rows, err = s.DB.Query(
+			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at
+			 FROM jobs WHERE status = ? ORDER BY created_at DESC`, status)
+	} else {
+		rows, err = s.DB.Query(
+			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at
+			 FROM jobs ORDER BY created_at DESC`)
+	}
+	if err != nil {
+		serverLogger.Error("Database query failed", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobList []*jobs.Job
+	for rows.Next() {
+		var j jobs.Job
+		var st string
+		if err := rows.Scan(&j.ID, &j.Command, &st, &j.StorageBytes, &j.VolumePath, &j.CreatedAt, &j.StartedAt, &j.FinishedAt); err != nil {
+			serverLogger.Error("Failed to scan job row", "error", err)
+			continue
+		}
+		j.Status = jobs.JobStatus(st)
+		jobList = append(jobList, &j)
+	}
+	return jobList, nil
+}
+
 func (s *JobStore) CancelJob(id string) (*jobs.Job, error) {
 	job, err := s.GetJob(id)
 	if err != nil {

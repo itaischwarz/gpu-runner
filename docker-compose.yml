@@ -6,8 +6,14 @@ services:
   server:
     build: .
     ports:
-      - "8080:80"
+      - "8080:8080"
+    volumes:
+      - jobdata:/data
+      - jobvolumes:/var/lib/jobrunner/volumes
     environment:
       - REDIS_HOST=redis
     depends_on:
       - redis
+volumes:
+  jobdata:
+  jobvolumes:

@@ -8,6 +8,7 @@ func NewRouter(h *Handlers) *mux.Router {
     r := mux.NewRouter()
 
     r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
+    r.HandleFunc("/jobs", h.ListJobs).Methods("GET")
     r.HandleFunc("/endjobs/{id}", h.CancelJob).Methods("POST")
     r.HandleFunc("/jobs/{id}", h.GetJob).Methods("GET")
     

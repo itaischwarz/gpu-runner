@@ -36,7 +36,7 @@ func main() {
     serverLogger.Info("Job executor created")
 
     serverLogger.Info("Initializing job store database", "path", "/Users/itaischwarz/projects/gpu-runner/jobs.db")
-    js, err := store.NewJobStore("/Users/itaischwarz/projects/gpu-runner/jobs.db")
+    js, err := store.NewJobStore("/data/jobs.db")
     if err != nil {
         serverLogger.Error("Failed to create job store", "error", err)
         log.Fatalf("Unable to create job store: %v", err)
@@ -70,7 +70,7 @@ func main() {
     router := api.NewRouter(handlers)
     serverLogger.Info("HTTP router configured")
 
-    serverAddr := ":8080"
+    serverAddr := "0.0.0.0:8080"
     serverLogger.Info("Starting HTTP server", "address", serverAddr)
     if err := http.ListenAndServe(serverAddr, router); err != nil {
         serverLogger.Error("Server failed", "error", err)

@@ -1,0 +1,382 @@
+time=2026-01-06T14:25:38.096-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-06T14:25:38.099-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-06T14:30:11.379-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-06T14:30:11.382-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-06T14:38:11.927-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-06T14:38:11.929-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-06T14:39:08.850-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-06T14:39:08.852-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-06T14:48:58.569-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-06T14:48:58.572-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-06T14:49:48.626-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-06T14:49:48.628-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-07T16:05:45.128-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-07T16:05:45.131-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-07T16:08:12.024-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-07T16:08:12.026-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-07T16:10:03.929-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-07T16:10:03.931-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-07T16:11:14.947-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-07T16:11:14.948-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-07T16:11:55.151-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-07T16:11:55.153-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-07T16:12:47.556-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-07T16:12:47.558-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:15:55.274-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:15:55.274-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:15:55.286-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:15:55.286-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:15:55.286-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:15:55.286-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:15:55.286-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:15:55.286-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:15:55.288-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:16:29.396-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:56980
+time=2026-01-11T14:16:29.406-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:56980
+time=2026-01-11T14:16:44.313-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:56996
+time=2026-01-11T14:16:44.313-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:56996
+time=2026-01-11T14:25:40.245-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:25:40.245-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:25:40.250-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:25:40.250-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:25:40.250-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:25:40.250-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:25:40.250-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:25:40.250-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:25:40.251-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:25:40.252-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:25:43.203-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:57546
+time=2026-01-11T14:25:43.203-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:57546
+time=2026-01-11T14:28:40.917-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:28:40.917-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:28:40.921-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:28:40.921-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:28:40.921-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:28:40.921-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:28:40.921-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:28:40.921-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:28:40.923-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:28:51.951-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:57907
+time=2026-01-11T14:28:51.951-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:57907
+time=2026-01-11T14:28:58.975-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:28:58.975-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:28:58.977-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:28:58.978-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:29:05.023-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:29:05.023-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:29:05.025-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:29:07.098-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:57922
+time=2026-01-11T14:29:07.098-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:57922
+time=2026-01-11T14:29:08.512-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:57925
+time=2026-01-11T14:29:08.512-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:57925
+time=2026-01-11T14:29:26.382-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:29:26.382-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:29:26.384-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:29:26.384-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:29:26.384-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:29:26.384-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:29:26.384-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:29:26.384-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:29:26.385-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:29:29.188-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:57958
+time=2026-01-11T14:29:29.188-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:57958
+time=2026-01-11T14:29:57.893-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:29:57.893-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:29:57.896-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:29:57.897-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:29:59.695-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:57997
+time=2026-01-11T14:29:59.695-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:57997
+time=2026-01-11T14:30:00.721-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58000
+time=2026-01-11T14:30:00.721-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:58000
+time=2026-01-11T14:30:26.772-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:30:26.773-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:30:26.778-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:30:26.778-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:30:26.778-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:30:26.778-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:30:26.779-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:30:26.779-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:30:26.785-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:30:26.785-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:30:26.785-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:30:26.786-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:30:30.363-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:30:30.363-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:30:30.364-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:30:30.365-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:30:30.365-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:30:30.365-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:30:30.365-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:30:30.365-05:00 level=ERROR msg="Server failed" error="listen tcp :8080: bind: address already in use"
+time=2026-01-11T14:31:12.584-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58050
+time=2026-01-11T14:31:12.584-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:58050
+time=2026-01-11T14:31:14.199-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58053
+time=2026-01-11T14:31:14.199-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:58053
+time=2026-01-11T14:33:50.876-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58169
+time=2026-01-11T14:33:50.876-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:58169
+time=2026-01-11T14:40:37.246-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58353
+time=2026-01-11T14:40:37.246-05:00 level=ERROR msg="Failed to decode request body" error="json: cannot unmarshal string into Go struct field .storage of type jobs.JobStorage" remote_addr=[::1]:58353
+time=2026-01-11T14:40:48.608-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58361
+time=2026-01-11T14:40:48.608-05:00 level=INFO msg="Parsed job request" command="ls -la" storage=0 max_retries=0
+time=2026-01-11T14:40:48.608-05:00 level=INFO msg="Adjusted storage size" requested=0 adjusted=10485760
+time=2026-01-11T14:40:48.608-05:00 level=INFO msg="Using default max_retries" max_retries=3
+time=2026-01-11T14:40:48.608-05:00 level=INFO msg="Creating job in database" command="ls -la" storage=10485760 volume_path=/var/lib/jobrunner/volumes/10mb
+time=2026-01-11T14:40:48.610-05:00 level=INFO msg="Job created in database" job_id=29 command="ls -la"
+time=2026-01-11T14:40:48.619-05:00 level=INFO msg="Job dequeued from Redis" job_id=29 status=pending
+time=2026-01-11T14:40:48.619-05:00 level=INFO msg="Passing job to worker queue" job_id=29
+time=2026-01-11T14:40:48.619-05:00 level=INFO msg="Job sent to worker queue successfully" job_id=29
+time=2026-01-11T14:40:48.619-05:00 level=INFO msg="Worker received job from queue" worker_id=1 job_id=29 status=running
+time=2026-01-11T14:40:48.619-05:00 level=INFO msg="Job enqueued successfully" job_id=29 queue=gpu-runner:jobs:pending
+time=2026-01-11T14:40:48.619-05:00 level=INFO msg="Job enqueued successfully" job_id=29
+time=2026-01-11T14:40:48.620-05:00 level=INFO msg="Setting up job execution context" worker_id=1 job_id=29 volume_path=/var/lib/jobrunner/volumes/10mb
+time=2026-01-11T14:40:48.620-05:00 level=INFO msg="Executing job command" worker_id=1 job_id=29
+time=2026-01-11T14:40:48.670-05:00 level=INFO msg="Job execution completed successfully" worker_id=1 job_id=29 output_length=101
+time=2026-01-11T14:40:49.671-05:00 level=INFO msg="Processing job result" job_id=29 status=success trial=1
+time=2026-01-11T14:40:49.671-05:00 level=INFO msg="Acknowledging successful job" job_id=29
+time=2026-01-11T14:40:49.672-05:00 level=INFO msg="Job acknowledged and removed from processing queue" job_id=29 status=success
+time=2026-01-11T14:41:07.963-05:00 level=INFO msg="Received get job request" job_id=29 remote_addr=[::1]:58379
+time=2026-01-11T14:41:07.963-05:00 level=INFO msg="Successfully fetched job" job_id=29 status=pending
+time=2026-01-11T14:41:09.420-05:00 level=INFO msg="Received get job request" job_id=29 remote_addr=[::1]:58382
+time=2026-01-11T14:41:09.420-05:00 level=INFO msg="Successfully fetched job" job_id=29 status=pending
+time=2026-01-11T14:41:10.386-05:00 level=INFO msg="Received get job request" job_id=29 remote_addr=[::1]:58387
+time=2026-01-11T14:41:10.387-05:00 level=INFO msg="Successfully fetched job" job_id=29 status=pending
+time=2026-01-11T14:45:08.047-05:00 level=INFO msg="Received get job request" job_id=29 remote_addr=[::1]:58471
+time=2026-01-11T14:45:08.047-05:00 level=INFO msg="Successfully fetched job" job_id=29 status=pending
+time=2026-01-11T14:45:17.274-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58476
+time=2026-01-11T14:45:17.274-05:00 level=INFO msg="Parsed job request" command=ls storage=0 max_retries=0
+time=2026-01-11T14:45:17.274-05:00 level=INFO msg="Adjusted storage size" requested=0 adjusted=10485760
+time=2026-01-11T14:45:17.274-05:00 level=INFO msg="Using default max_retries" max_retries=3
+time=2026-01-11T14:45:17.274-05:00 level=INFO msg="Creating job in database" command=ls storage=10485760 volume_path=/var/lib/jobrunner/volumes/10mb
+time=2026-01-11T14:45:17.276-05:00 level=INFO msg="Job created in database" job_id=30 command=ls
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Job dequeued from Redis" job_id=30 status=pending
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Passing job to worker queue" job_id=30
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Job sent to worker queue successfully" job_id=30
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Worker received job from queue" worker_id=3 job_id=30 status=running
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Job enqueued successfully" job_id=30 queue=gpu-runner:jobs:pending
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Job enqueued successfully" job_id=30
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Setting up job execution context" worker_id=3 job_id=30 volume_path=/var/lib/jobrunner/volumes/10mb
+time=2026-01-11T14:45:17.277-05:00 level=INFO msg="Executing job command" worker_id=3 job_id=30
+time=2026-01-11T14:45:17.295-05:00 level=INFO msg="Job execution completed successfully" worker_id=3 job_id=30 output_length=0
+time=2026-01-11T14:45:18.297-05:00 level=INFO msg="Processing job result" job_id=30 status=success trial=1
+time=2026-01-11T14:45:18.297-05:00 level=INFO msg="Acknowledging successful job" job_id=30
+time=2026-01-11T14:45:18.298-05:00 level=INFO msg="Job acknowledged and removed from processing queue" job_id=30 status=success
+time=2026-01-11T14:45:20.475-05:00 level=INFO msg="Received get job request" job_id=30 remote_addr=[::1]:58479
+time=2026-01-11T14:45:20.475-05:00 level=INFO msg="Successfully fetched job" job_id=30 status=pending
+time=2026-01-11T14:45:28.401-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-11T14:45:28.401-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-11T14:45:28.405-05:00 level=INFO msg="✅ Redis connected"
+time=2026-01-11T14:45:28.405-05:00 level=INFO msg="Redis client initialized successfully"
+time=2026-01-11T14:45:28.405-05:00 level=INFO msg="Stream sink created"
+time=2026-01-11T14:45:28.405-05:00 level=INFO msg="Job queue created" capacity=10
+time=2026-01-11T14:45:28.405-05:00 level=INFO msg="Job executor created"
+time=2026-01-11T14:45:28.405-05:00 level=INFO msg="Initializing job store database" path=/Users/itaischwarz/projects/gpu-runner/jobs.db
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Succesfully Created DB in /Users/itaischwarz/projects/gpu-runner/jobs.db"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting Redis adapter"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting Redis adapter" queue=gpu-runner:jobs:pending
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Created results channel" buffer_size=100
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting workers" count=3
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Creating new worker" worker_id=1
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting worker" worker_id=1
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Creating new worker" worker_id=2
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting worker" worker_id=2
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Creating new worker" worker_id=3
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting worker" worker_id=3
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="All workers started successfully"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="API handlers initialized"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting Redis acknowledger goroutine"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Redis acknowledger started"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="HTTP router configured"
+time=2026-01-11T14:45:28.406-05:00 level=INFO msg="Starting HTTP server" address=:8080
+time=2026-01-11T14:45:30.962-05:00 level=INFO msg="Received get job request" job_id=30 remote_addr=[::1]:58488
+time=2026-01-11T14:45:30.963-05:00 level=INFO msg="Successfully fetched job" job_id=30 status=pending
+time=2026-01-11T14:45:33.964-05:00 level=INFO msg="Received create job request" remote_addr=[::1]:58492
+time=2026-01-11T14:45:33.964-05:00 level=INFO msg="Raw request body" body="{\"command\":\"ls\",\"max_retries\":0,\"storage\":0}" remote_addr=[::1]:58492
+time=2026-01-11T14:45:33.964-05:00 level=INFO msg="Parsed job request" command=ls storage=0 max_retries=0
+time=2026-01-11T14:45:33.964-05:00 level=INFO msg="Adjusted storage size" requested=0 adjusted=10485760
+time=2026-01-11T14:45:33.964-05:00 level=INFO msg="Using default max_retries" max_retries=3
+time=2026-01-11T14:45:33.964-05:00 level=INFO msg="Creating job in database" command=ls storage=10485760 volume_path=/var/lib/jobrunner/volumes/10mb
+time=2026-01-11T14:45:33.965-05:00 level=INFO msg="Job created in database" job_id=31 command=ls
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Job dequeued from Redis" job_id=31 status=pending
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Passing job to worker queue" job_id=31
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Job sent to worker queue successfully" job_id=31
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Worker received job from queue" worker_id=1 job_id=31 status=running
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Job enqueued successfully" job_id=31 queue=gpu-runner:jobs:pending
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Job enqueued successfully" job_id=31
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Setting up job execution context" worker_id=1 job_id=31 volume_path=/var/lib/jobrunner/volumes/10mb
+time=2026-01-11T14:45:33.966-05:00 level=INFO msg="Executing job command" worker_id=1 job_id=31
+time=2026-01-11T14:45:33.982-05:00 level=INFO msg="Job execution completed successfully" worker_id=1 job_id=31 output_length=0
+time=2026-01-11T14:45:34.984-05:00 level=INFO msg="Processing job result" job_id=31 status=success trial=1
+time=2026-01-11T14:45:34.985-05:00 level=INFO msg="Acknowledging successful job" job_id=31
+time=2026-01-11T14:45:34.986-05:00 level=INFO msg="Job acknowledged and removed from processing queue" job_id=31 status=success
+time=2026-01-11T14:45:36.114-05:00 level=INFO msg="Received get job request" job_id=31 remote_addr=[::1]:58496
+time=2026-01-11T14:45:36.114-05:00 level=INFO msg="Successfully fetched job" job_id=31 status=success
+time=2026-01-11T14:45:38.160-05:00 level=INFO msg="Received get job request" job_id=31 remote_addr=[::1]:58499
+time=2026-01-11T14:45:38.160-05:00 level=INFO msg="Successfully fetched job" job_id=31 status=success
+time=2026-01-12T10:20:48.422-05:00 level=ERROR msg="Redis dequeue failed" error="read tcp [::1]:58485->[::1]:6379: i/o timeout" queue=gpu-runner:jobs:pending
+time=2026-01-26T14:44:47.360-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-26T14:44:47.361-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-26T14:44:49.557-05:00 level=ERROR msg="Failed to create Redis client" error="redis unavaialable: dial tcp: lookup redis: no such host"
+time=2026-01-26T15:13:59.711-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-26T15:13:59.711-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-26T15:14:01.878-05:00 level=ERROR msg="Failed to create Redis client" error="redis unavaialable: dial tcp: lookup redis: no such host"
+time=2026-01-30T10:44:38.217-05:00 level=INFO msg="Starting GPU Runner server"
+time=2026-01-30T10:44:38.219-05:00 level=INFO msg="Initializing Redis client"
+time=2026-01-30T10:44:40.582-05:00 level=ERROR msg="Failed to create Redis client" error="redis unavaialable: dial tcp: lookup redis: no such host"

@@ -164,6 +164,24 @@ func (h *Handlers) CancelJob(w http.ResponseWriter, r *http.Request){
     }
 }
 
+func (h *Handlers) ListJobs(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	ServerLogger.Info("Received list jobs request", "status_filter", status, "remote_addr", r.RemoteAddr)
+
+	jobList, err := h.JobStore.ListJobs(status)
+	if err != nil {
+		ServerLogger.Error("Failed to list jobs", "error", err)
+		http.Error(w, "failed to list jobs", http.StatusInternalServerError)
+		return
+	}
+
+	ServerLogger.Info("Successfully listed jobs", "count", len(jobList))
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(jobList); err != nil {
+		ServerLogger.Error("Failed to encode job list response", "error", err)
+	}
+}
+
 func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
     id := mux.Vars(r)["id"]
     ServerLogger.Info("Received get job request", "job_id", id, "remote_addr", r.RemoteAddr)
