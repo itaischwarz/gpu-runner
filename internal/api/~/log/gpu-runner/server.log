@@ -1,0 +1,50 @@
+time=2026-01-30T11:19:44.286-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-2867685105.db"
+time=2026-01-30T11:19:44.293-05:00 level=INFO msg="Received get job request" job_id=1 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:19:44.293-05:00 level=INFO msg="Successfully fetched job" job_id=1 status=pending
+time=2026-01-30T11:19:44.294-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3367206661.db"
+time=2026-01-30T11:19:44.294-05:00 level=INFO msg="Received get job request" job_id=999 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:19:44.294-05:00 level=ERROR msg="Database query failed" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:19:44.294-05:00 level=ERROR msg="Failed to fetch job from database" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:19:44.294-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-4265280532.db"
+time=2026-01-30T11:19:44.295-05:00 level=INFO msg="Received list jobs request" status_filter="" remote_addr=192.0.2.1:1234
+time=2026-01-30T11:19:44.295-05:00 level=INFO msg="Successfully listed jobs" count=3
+time=2026-01-30T11:19:44.295-05:00 level=INFO msg="Received list jobs request" status_filter=pending remote_addr=192.0.2.1:1234
+time=2026-01-30T11:19:44.295-05:00 level=INFO msg="Successfully listed jobs" count=1
+time=2026-01-30T11:19:44.296-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-2669245533.db"
+time=2026-01-30T11:19:44.296-05:00 level=INFO msg="Received list jobs request" status_filter="" remote_addr=192.0.2.1:1234
+time=2026-01-30T11:19:44.296-05:00 level=INFO msg="Successfully listed jobs" count=0
+time=2026-01-30T11:19:44.297-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-2077563919.db"
+time=2026-01-30T11:19:44.297-05:00 level=INFO msg="Received cancel job request" job_id=1 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:19:44.297-05:00 level=INFO msg="Attempting to cancel running job" job_id=1
+time=2026-01-30T11:19:44.297-05:00 level=WARN msg="Attempted to cancel non-existent or already completed job" job_id=1
+time=2026-01-30T11:19:44.297-05:00 level=WARN msg="Job not currently running or already completed" error="job 1 cannot be cancelled because it does not exist" job_id=1
+time=2026-01-30T11:19:44.297-05:00 level=INFO msg="Job cancelled in database" job_id=1 reason="no longer needed"
+time=2026-01-30T11:21:45.790-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3829856224.db"
+time=2026-01-30T11:21:45.791-05:00 level=INFO msg="Received get job request" job_id=1 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.791-05:00 level=INFO msg="Successfully fetched job" job_id=1 status=pending
+time=2026-01-30T11:21:45.792-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-2817227324.db"
+time=2026-01-30T11:21:45.792-05:00 level=INFO msg="Received get job request" job_id=999 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.792-05:00 level=ERROR msg="Database query failed" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:21:45.792-05:00 level=ERROR msg="Failed to fetch job from database" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:21:45.793-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3104283634.db"
+time=2026-01-30T11:21:45.794-05:00 level=INFO msg="Received list jobs request" status_filter="" remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.794-05:00 level=INFO msg="Successfully listed jobs" count=3
+time=2026-01-30T11:21:45.794-05:00 level=INFO msg="Received list jobs request" status_filter=pending remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.794-05:00 level=INFO msg="Successfully listed jobs" count=1
+time=2026-01-30T11:21:45.795-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3924417715.db"
+time=2026-01-30T11:21:45.795-05:00 level=INFO msg="Received list jobs request" status_filter="" remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.795-05:00 level=INFO msg="Successfully listed jobs" count=0
+time=2026-01-30T11:21:45.796-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-1856158446.db"
+time=2026-01-30T11:21:45.796-05:00 level=INFO msg="Received cancel job request" job_id=999 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.796-05:00 level=INFO msg="Attempting to cancel running job" job_id=999
+time=2026-01-30T11:21:45.796-05:00 level=WARN msg="Attempted to cancel non-existent or already completed job" job_id=999
+time=2026-01-30T11:21:45.796-05:00 level=WARN msg="Job not currently running or already completed" error="job 999 cannot be cancelled because it does not exist" job_id=999
+time=2026-01-30T11:21:45.796-05:00 level=ERROR msg="Database query failed" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:21:45.796-05:00 level=ERROR msg="Unable to cancel job in store" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:21:45.797-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3842584382.db"
+time=2026-01-30T11:21:45.797-05:00 level=INFO msg="Received cancel job request" job_id=1 remote_addr=192.0.2.1:1234
+time=2026-01-30T11:21:45.797-05:00 level=INFO msg="Attempting to cancel running job" job_id=1
+time=2026-01-30T11:21:45.797-05:00 level=WARN msg="Attempted to cancel non-existent or already completed job" job_id=1
+time=2026-01-30T11:21:45.797-05:00 level=WARN msg="Job not currently running or already completed" error="job 1 cannot be cancelled because it does not exist" job_id=1
+time=2026-01-30T11:21:45.797-05:00 level=ERROR msg="Unable to cancel job in store" error="job cannot be cancelled: status is success" job_id=1
+time=2026-01-30T11:21:45.798-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3620118023.db"

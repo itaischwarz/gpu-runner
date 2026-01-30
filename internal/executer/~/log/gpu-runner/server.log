@@ -1,0 +1,20 @@
+time=2026-01-30T11:22:02.112-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobSuccess1928141047/001
+time=2026-01-30T11:22:02.112-05:00 level=INFO msg="Executing command" command="echo hello world"
+time=2026-01-30T11:22:02.116-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobFailure3687117582/001
+time=2026-01-30T11:22:02.116-05:00 level=INFO msg="Executing command" command="exit 1"
+time=2026-01-30T11:22:02.120-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobCapturesStderr2081893841/001
+time=2026-01-30T11:22:02.120-05:00 level=INFO msg="Executing command" command="echo error-output >&2 && exit 1"
+time=2026-01-30T11:22:02.123-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobContextCancellation507675317/001
+time=2026-01-30T11:22:02.123-05:00 level=INFO msg="Executing command" command="sleep 30"
+time=2026-01-30T11:22:02.224-05:00 level=INFO msg="Job cancelled by context" job_id=test-4
+time=2026-01-30T11:22:02.225-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobTimeout1554087301/001
+time=2026-01-30T11:22:02.226-05:00 level=INFO msg="Executing command" command="sleep 30"
+time=2026-01-30T11:22:02.427-05:00 level=WARN msg="Job timed out" job_id=test-5
+time=2026-01-30T11:22:02.430-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobWorkingDirectory3511153458/001
+time=2026-01-30T11:22:02.430-05:00 level=INFO msg="Executing command" command="cat marker.txt"
+time=2026-01-30T11:22:02.441-05:00 level=INFO msg="Cancelling job execution" job_id=job-1
+time=2026-01-30T11:22:02.441-05:00 level=WARN msg="Attempted to cancel non-existent or already completed job" job_id=does-not-exist
+time=2026-01-30T11:22:02.441-05:00 level=WARN msg="Attempted to cancel non-existent or already completed job" job_id=job-2
+time=2026-01-30T11:22:02.441-05:00 level=INFO msg="Setting up command execution environment" volume_path=/var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/TestRunJobRemovesCancelFunc4135263530/001
+time=2026-01-30T11:22:02.442-05:00 level=INFO msg="Executing command" command="echo done"
+time=2026-01-30T11:22:02.446-05:00 level=WARN msg="Attempted to cancel non-existent or already completed job" job_id=test-cleanup

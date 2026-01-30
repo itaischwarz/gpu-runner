@@ -1,0 +1,13 @@
+time=2026-01-30T11:19:44.930-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-730116968.db"
+time=2026-01-30T11:19:44.932-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-43302908.db"
+time=2026-01-30T11:19:44.936-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-2681594173.db"
+time=2026-01-30T11:19:44.937-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-1184614501.db"
+time=2026-01-30T11:19:44.937-05:00 level=ERROR msg="Database query failed" error="sql: no rows in result set" job_id=999
+time=2026-01-30T11:19:44.938-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-2588649582.db"
+time=2026-01-30T11:19:44.939-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-2304288168.db"
+time=2026-01-30T11:19:44.941-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-1921661605.db"
+time=2026-01-30T11:19:44.943-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-843364658.db"
+time=2026-01-30T11:19:44.944-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-2754707888.db"
+time=2026-01-30T11:19:44.945-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-1541742489.db"
+time=2026-01-30T11:19:44.947-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-jobs-2366909229.db"
+time=2026-01-30T11:19:44.947-05:00 level=ERROR msg="Database query failed" error="sql: no rows in result set" job_id=999
