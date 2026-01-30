@@ -40,7 +40,7 @@ func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	executorLogger.Info("Executing command", logger.Item("command", command))
+	executorLogger.Info("Executing command", "command", command)
 
 	if err := cmd.Run(); err != nil {
 		output := stdout.String() + stderr.String()
