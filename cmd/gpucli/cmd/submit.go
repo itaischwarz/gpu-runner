@@ -23,9 +23,9 @@ var submitCmd = &cobra.Command{
 		if len(storage) != 0 {
 			storageInt, err = strconv.Atoi(storage)
 			if err != nil {
-					return fmt.Errorf("invalid storage value '%s': must be an integer", storage)
+				return fmt.Errorf("invalid storage value '%s': must be an integer", storage)
 			}
-		} 
+		}
 
 		maxRetriesStr, _ := cmd.Flags().GetString("maxRetries")
 		maxRetries := 0
@@ -37,7 +37,7 @@ var submitCmd = &cobra.Command{
 		}
 
 		body := map[string]any{"command": command, "storage": storageInt, "max_retries": maxRetries}
-		
+
 		data, err := json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("encode request: %w", err)

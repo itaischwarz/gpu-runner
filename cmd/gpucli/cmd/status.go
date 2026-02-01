@@ -21,7 +21,7 @@ var statusCmd = &cobra.Command{
 		resp, err := http.Get(base + "/jobs/" + jobID)
 
 		if err != nil {
-            fmt.Print("Failed sending to this url",base + "/jobs/" + jobID)
+			fmt.Print("Failed sending to this url", base+"/jobs/"+jobID)
 			return fmt.Errorf("status request failed: %w", err)
 		}
 		defer resp.Body.Close()

@@ -10,7 +10,6 @@ import (
 	"gpu-runner/internal/logger"
 
 	_ "github.com/mattn/go-sqlite3"
-
 )
 
 type JobStore struct {
@@ -109,9 +108,6 @@ func (s *JobStore) UpdateJob(j *jobs.Job) error {
 
 	return nil
 }
-
-
-
 
 func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 	row := s.DB.QueryRow(

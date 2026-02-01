@@ -3,7 +3,6 @@ module gpu-runner
 go 1.25.1
 
 require (
-	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/spf13/cobra v1.10.1
 )
@@ -15,7 +14,7 @@ require (
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/mattn/go-sqlite3 v1.14.32 // indirect
+	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/spf13/pflag v1.0.9 // indirect
 )

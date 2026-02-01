@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"gpu-runner/internal/logger"
 	"os"
 	"os/exec"
 	"sync"
-	"gpu-runner/internal/logger"
 )
 
 var executorLogger = logger.Server
@@ -71,7 +71,6 @@ func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context
 	return output, nil
 }
 
-
 func (e *Executor) SetCancelFunc(jobID string, cancel context.CancelFunc) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -89,7 +88,7 @@ func (e *Executor) CancelJob(jobID string) error {
 	cancel := e.cancels[jobID]
 	e.mu.RUnlock()
 
-	if cancel == nil{
+	if cancel == nil {
 		executorLogger.Warn("Attempted to cancel non-existent or already completed job", "job_id", jobID)
 		return fmt.Errorf("job %s cannot be cancelled because it does not exist", jobID)
 	}

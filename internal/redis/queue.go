@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
+	"time"
 )
 
 var redisLogger = logger.Server
@@ -102,7 +102,6 @@ func (c *Client) QueueLength(ctx context.Context) (int64, error) {
 	return length, nil
 }
 
-
 // RequeueStaleJobs moves jobs from processing back to pending (for crash recovery)
 func (c *Client) RequeueStaleJobs(ctx context.Context) (int64, error) {
 	redisLogger.Info("Starting stale job requeue process", "processing_queue", JobProcessingKey)
@@ -153,14 +152,8 @@ func (c *Client) StartRedisAdapter(ctx context.Context, jobQueue *jobs.JobQueue,
 				case jobQueue.Queue <- job:
 					redisLogger.Info("Job sent to worker queue successfully", "job_id", job.ID)
 				}
-				}
+			}
 		}
 	}()
 	return nil
 }
-
-
-
-		
-	
-

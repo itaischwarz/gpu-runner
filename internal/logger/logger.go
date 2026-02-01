@@ -26,4 +26,3 @@ func init() {
 
 	Server = slog.New(handler)
 }
-
