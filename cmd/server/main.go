@@ -77,15 +77,18 @@ func main() {
 		Addr: serverAdr,
 		Handler: router,
 	}
-	if err := server.ListenAndServe(); err != nil {
-		serverLogger.Error("Server failed", "error", err)
-		log.Fatal(err)
-	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			serverLogger.Error("Server failed", "error", err)
+			log.Fatal(err)
+		}
+	}()
+
 	<-quitCtx.Done()
 
 
 	ctx = context.Background()
-	serverLogger.Info("Server shutting dow")
+	serverLogger.Info("Server shutting down")
 	if err := server.Shutdown(ctx); err != nil{
 		serverLogger.Info("Server gracefully shutting down")
 	}

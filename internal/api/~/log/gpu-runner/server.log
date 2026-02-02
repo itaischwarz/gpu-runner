@@ -77,3 +77,5 @@ time=2026-01-30T11:26:17.147-05:00 level=WARN msg="Attempted to cancel non-exist
 time=2026-01-30T11:26:17.147-05:00 level=WARN msg="Job not currently running or already completed" error="job 1 cannot be cancelled because it does not exist" job_id=1
 time=2026-01-30T11:26:17.147-05:00 level=ERROR msg="Unable to cancel job in store" error="job cannot be cancelled: status is success" job_id=1
 time=2026-01-30T11:26:17.148-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-2665737628.db"
+time=2026-02-01T18:16:27.981-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-1589723257.db"
+time=2026-02-01T18:16:27.982-05:00 level=INFO msg="Succesfully Created DB in /var/folders/kz/f1bt39h15t7gjgjg8vt4n3yw0000gn/T/test-api-3764832399.db"

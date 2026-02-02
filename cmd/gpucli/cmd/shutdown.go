@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-
 	"github.com/spf13/cobra"
+	"io"
 )
 
 var shutdownCmd = &cobra.Command{
@@ -13,11 +13,20 @@ var shutdownCmd = &cobra.Command{
 	Short: "Gracefully Shutdown GPU Runner Server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		token := os.Getenv("SHUTDOWN_TOKEN")
-		req, _ := http.NewRequest("DELETE", server+"/server", nil)
+		base := "http://0.0.0.0:8080"
+		fmt.Println("server", server)
+		req, err := http.NewRequest("DELETE", base+"/server", nil)
+		if err != nil {
+    	fmt.Print("Error", err)
+		}
 		req.Header.Set("Authorization", "Bearer "+token)
-		if _, err := http.DefaultClient.Do(req); err != nil{
+		resp, err := http.DefaultClient.Do(req)
+
+		if err != nil{
 			return fmt.Errorf("Unable to shutdown server: %s", err)
 		}
+		body, err := io.ReadAll(resp.Body)
+		fmt.Println(string(body))
 		return nil
 
 
@@ -25,6 +34,8 @@ var shutdownCmd = &cobra.Command{
 }
 
 func init() {
-	submitCmd.Flags().String("reason", "", "Reason for Shutdown")
+	shutdownCmd.Flags().String("reason", "", "Reason for Shutdown")
 	shutdownCmd.MarkFlagRequired("reason")
+
+	rootCmd.AddCommand(shutdownCmd)
 } 

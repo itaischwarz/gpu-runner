@@ -24,5 +24,5 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&server, "server", "0.0.0.0:8080", "GPU runner server URL")
+	rootCmd.PersistentFlags().StringVar(&server, "server", "http://0.0.0.0:8080", "GPU runner server URL")
 }

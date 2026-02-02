@@ -202,6 +202,7 @@ func TestRouterRegistration(t *testing.T) {
 		{"GET", "/jobs"},
 		{"POST", "/endjobs/123"},
 		{"GET", "/jobs/123"},
+		{"DELETE", "/server"},
 	}
 
 	for _, tc := range routes {
@@ -210,5 +211,97 @@ func TestRouterRegistration(t *testing.T) {
 		if !router.Match(req, match) {
 			t.Errorf("expected route %s %s to match", tc.method, tc.path)
 		}
+	}
+}
+
+func TestAuthMiddleWareValidToken(t *testing.T) {
+	token := "test-secret-token"
+	called := false
+
+	handler := AuthMiddleWare(token, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("DELETE", "/server", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+
+	handler(rr, req)
+
+	if !called {
+		t.Error("expected inner handler to be called with valid token")
+	}
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestAuthMiddleWareInvalidToken(t *testing.T) {
+	handler := AuthMiddleWare("correct-token", func(w http.ResponseWriter, r *http.Request) {
+		t.Error("inner handler should not be called with invalid token")
+	})
+
+	req := httptest.NewRequest("DELETE", "/server", nil)
+	req.Header.Set("Authorization", "Bearer wrong-token")
+	rr := httptest.NewRecorder()
+
+	handler(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestAuthMiddleWareMissingToken(t *testing.T) {
+	handler := AuthMiddleWare("some-token", func(w http.ResponseWriter, r *http.Request) {
+		t.Error("inner handler should not be called with missing token")
+	})
+
+	req := httptest.NewRequest("DELETE", "/server", nil)
+	rr := httptest.NewRecorder()
+
+	handler(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestShutdownEndpointWithAuth(t *testing.T) {
+	token := "shutdown-secret"
+	t.Setenv("SHUTDOWN_TOKEN", token)
+
+	quitCalled := false
+	h := setupTestHandlers(t)
+	h.QuitFunction = func() { quitCalled = true }
+
+	router := NewRouter(h)
+
+	// Valid token should trigger shutdown
+	req := httptest.NewRequest("DELETE", "/server", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+	if !quitCalled {
+		t.Error("expected QuitFunction to be called")
+	}
+
+	// Invalid token should be rejected
+	quitCalled = false
+	req = httptest.NewRequest("DELETE", "/server", nil)
+	req.Header.Set("Authorization", "Bearer wrong-token")
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+	if quitCalled {
+		t.Error("QuitFunction should not be called with invalid token")
 	}
 }
