@@ -17,7 +17,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v6
       - name: Lint Go
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
   test:
     name: Test Go Code
     runs-on: ubuntu-latest
