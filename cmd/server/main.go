@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"gpu-runner/internal/api"
+	"gpu-runner/internal/config"
 	"gpu-runner/internal/executer"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
@@ -10,17 +11,36 @@ import (
 	"gpu-runner/internal/store"
 	"log"
 	"net/http"
-	"syscall"
 	"os/signal"
+	"syscall"
 )
 
 var serverLogger = logger.Server
 
 func main() {
+	// Load configuration from environment variables
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Initialize logger with configuration
+	if err := logger.InitLogger(&cfg.Logger); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	serverLogger = logger.Server
+
 	serverLogger.Info("Starting GPU Runner server")
+	serverLogger.Info("Configuration loaded",
+		"server_addr", cfg.ServerAddr(),
+		"redis_addr", cfg.Redis.Address,
+		"database_path", cfg.Database.Path,
+		"worker_count", cfg.Worker.Count,
+		"job_timeout", cfg.Worker.JobTimeout,
+	)
 
 	serverLogger.Info("Initializing Redis client")
-	client, err := redis.New()
+	client, err := redis.New(&cfg.Redis)
 	if err != nil {
 		serverLogger.Error("Failed to create Redis client", "error", err)
 		log.Fatalf("Failed to create Redis client: %v", err)
@@ -30,18 +50,21 @@ func main() {
 	streamSink := redis.NewStreamSink(client)
 	serverLogger.Info("Stream sink created")
 
-	jobQueue := jobs.NewJobQueue(10)
-	serverLogger.Info("Job queue created", "capacity", 10)
+	jobQueue := jobs.NewJobQueue(cfg.Worker.QueueCapacity)
+	serverLogger.Info("Job queue created", "capacity", cfg.Worker.QueueCapacity)
 
-	jobQueue.Executor = executer.NewExecutor()
+	jobQueue.Executor = executer.NewExecutor(cfg.Worker.JobTimeout)
 	serverLogger.Info("Job executor created")
 
-	serverLogger.Info("Initializing job store database", "path", "/Users/itaischwarz/projects/gpu-runner/jobs.db")
-	js, err := store.NewJobStore("/data/jobs.db")
+	serverLogger.Info("Initializing job store database", "path", cfg.Database.Path)
+	js, err := store.NewJobStore(cfg.Database.Path)
 	if err != nil {
 		serverLogger.Error("Failed to create job store", "error", err)
 		log.Fatalf("Unable to create job store: %v", err)
 	}
+
+	// Initialize volume paths
+	jobs.InitVolumePaths(&cfg.Storage)
 
 	ctx := context.Background()
 
@@ -51,12 +74,11 @@ func main() {
 		log.Fatalf("Failed to start Redis adapter: %v", err)
 	}
 
-	results := make(chan *jobs.Job, 100)
-	serverLogger.Info("Created results channel", "buffer_size", 100)
+	results := make(chan *jobs.Job, cfg.Worker.ResultsBuffer)
+	serverLogger.Info("Created results channel", "buffer_size", cfg.Worker.ResultsBuffer)
 
-	numWorkers := 3
-	serverLogger.Info("Starting workers", "count", numWorkers)
-	for i := 1; i <= numWorkers; i++ {
+	serverLogger.Info("Starting workers", "count", cfg.Worker.Count)
+	for i := 1; i <= cfg.Worker.Count; i++ {
 		worker := jobs.NewWorker(i, jobQueue, results)
 		worker.Start(ctx)
 	}
@@ -71,14 +93,14 @@ func main() {
 
 	router := api.NewRouter(handlers)
 	serverLogger.Info("HTTP router configured")
-	serverAdr := "0.0.0.0:8080"
 
 	server := &http.Server{
-		Addr: serverAdr,
+		Addr:    cfg.ServerAddr(),
 		Handler: router,
 	}
 	go func() {
-		if err := server.ListenAndServe(); err != nil {
+		serverLogger.Info("Server listening", "address", cfg.ServerAddr())
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverLogger.Error("Server failed", "error", err)
 			log.Fatal(err)
 		}
@@ -86,11 +108,12 @@ func main() {
 
 	<-quitCtx.Done()
 
-
 	ctx = context.Background()
-	serverLogger.Info("Server shutting down")
-	if err := server.Shutdown(ctx); err != nil{
-		serverLogger.Info("Server gracefully shutting down")
+	serverLogger.Info("Server shutting down gracefully")
+	if err := server.Shutdown(ctx); err != nil {
+		serverLogger.Error("Error during shutdown", "error", err)
+	} else {
+		serverLogger.Info("Server shutdown complete")
 	}
 
 }

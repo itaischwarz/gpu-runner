@@ -20,7 +20,7 @@ func newTestLogger(jobID string) logger.JobLogger {
 }
 
 func TestRunJobSuccess(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()
@@ -36,7 +36,7 @@ func TestRunJobSuccess(t *testing.T) {
 }
 
 func TestRunJobFailure(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()
@@ -52,7 +52,7 @@ func TestRunJobFailure(t *testing.T) {
 }
 
 func TestRunJobCapturesStderr(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()
@@ -68,7 +68,7 @@ func TestRunJobCapturesStderr(t *testing.T) {
 }
 
 func TestRunJobContextCancellation(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -87,7 +87,7 @@ func TestRunJobContextCancellation(t *testing.T) {
 }
 
 func TestRunJobTimeout(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -101,7 +101,7 @@ func TestRunJobTimeout(t *testing.T) {
 }
 
 func TestRunJobWorkingDirectory(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	// Create a file in tmpDir to verify working directory
@@ -122,7 +122,7 @@ func TestRunJobWorkingDirectory(t *testing.T) {
 }
 
 func TestCancelFuncLifecycle(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -141,7 +141,7 @@ func TestCancelFuncLifecycle(t *testing.T) {
 }
 
 func TestCancelNonExistentJob(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 
 	err := e.CancelJob("does-not-exist")
 	if err == nil {
@@ -150,7 +150,7 @@ func TestCancelNonExistentJob(t *testing.T) {
 }
 
 func TestRemoveCancelFunc(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 
 	_, cancel := context.WithCancel(context.Background())
 	e.SetCancelFunc("job-2", cancel)
@@ -164,7 +164,7 @@ func TestRemoveCancelFunc(t *testing.T) {
 }
 
 func TestRunJobRemovesCancelFunc(t *testing.T) {
-	e := NewExecutor()
+	e := NewExecutor(30 * time.Second)
 	tmpDir := t.TempDir()
 
 	ctx := context.Background()

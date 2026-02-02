@@ -8,19 +8,27 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 )
 
 var executorLogger = logger.Server
 
 type Executor struct {
-	cancels map[string]context.CancelFunc
-	mu      sync.RWMutex
+	cancels    map[string]context.CancelFunc
+	mu         sync.RWMutex
+	jobTimeout time.Duration
 }
 
-func NewExecutor() *Executor {
+func NewExecutor(jobTimeout time.Duration) *Executor {
 	return &Executor{
-		cancels: make(map[string]context.CancelFunc),
+		cancels:    make(map[string]context.CancelFunc),
+		jobTimeout: jobTimeout,
 	}
+}
+
+// GetJobTimeout returns the configured job timeout
+func (e *Executor) GetJobTimeout() time.Duration {
+	return e.jobTimeout
 }
 
 func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger) (string, error) {

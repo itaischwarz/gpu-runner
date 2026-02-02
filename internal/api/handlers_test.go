@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"gpu-runner/internal/executer"
 	"gpu-runner/internal/jobs"
@@ -31,7 +32,7 @@ func setupTestHandlers(t *testing.T) *Handlers {
 	}
 	t.Cleanup(func() { jobStore.DB.Close() })
 
-	exec := executer.NewExecutor()
+	exec := executer.NewExecutor(30 * time.Second)
 	queue := jobs.NewJobQueue(10)
 	queue.Executor = exec
 

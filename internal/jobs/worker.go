@@ -36,8 +36,9 @@ func (w *Worker) Start(ctx context.Context) {
 				workerLogger.Info("Worker received job from queue", "worker_id", w.ID, "job_id", job.ID, "status", job.Status)
 				job.Logger.Info("Job Running", logger.Item("Job Status", job.Status), logger.Item("worker", w.ID), logger.Item("command", job.Command))
 				volumePath := VolumePaths[job.StorageBytes]
-				jobCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-				workerLogger.Info("Setting up job execution context", "worker_id", w.ID, "job_id", job.ID, "volume_path", volumePath)
+				jobTimeout := w.JobQueue.Executor.GetJobTimeout()
+				jobCtx, cancel := context.WithTimeout(ctx, jobTimeout)
+				workerLogger.Info("Setting up job execution context", "worker_id", w.ID, "job_id", job.ID, "volume_path", volumePath, "timeout", jobTimeout)
 
 				w.JobQueue.Executor.SetCancelFunc(job.ID, cancel)
 

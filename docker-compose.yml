@@ -2,20 +2,52 @@ services:
   redis:
     image: redis:alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
+
   server:
     build: .
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
     volumes:
       - jobdata:/data
       - jobvolumes:/var/lib/jobrunner/volumes
     environment:
-      - REDIS_HOST=redis
+      # Server Configuration
+      - SERVER_ADDRESS=${SERVER_ADDRESS:-0.0.0.0}
+      - SERVER_PORT=${SERVER_PORT:-8080}
+
+      # Redis Configuration
+      - REDIS_ADDRESS=${REDIS_ADDRESS:-redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_DIAL_TIMEOUT=${REDIS_DIAL_TIMEOUT:-5s}
+      - REDIS_READ_TIMEOUT=${REDIS_READ_TIMEOUT:-3s}
+      - REDIS_WRITE_TIMEOUT=${REDIS_WRITE_TIMEOUT:-3s}
+      - REDIS_MAX_RETRIES=${REDIS_MAX_RETRIES:-3}
+
+      # Database Configuration
+      - DATABASE_PATH=${DATABASE_PATH:-/data/jobs.db}
+
+      # Worker Configuration
+      - WORKER_COUNT=${WORKER_COUNT:-3}
+      - WORKER_JOB_TIMEOUT=${WORKER_JOB_TIMEOUT:-30s}
+      - WORKER_QUEUE_CAPACITY=${WORKER_QUEUE_CAPACITY:-10}
+      - WORKER_RESULTS_BUFFER=${WORKER_RESULTS_BUFFER:-100}
+
+      # Storage Configuration
+      - STORAGE_VOLUME_10MB_PATH=${STORAGE_VOLUME_10MB_PATH:-/var/lib/jobrunner/volumes/10mb}
+      - STORAGE_VOLUME_25MB_PATH=${STORAGE_VOLUME_25MB_PATH:-/var/lib/jobrunner/volumes/25mb}
+      - STORAGE_VOLUME_50MB_PATH=${STORAGE_VOLUME_50MB_PATH:-/var/lib/jobrunner/volumes/50mb}
+
+      # Logger Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_DIR=${LOG_DIR:-/var/log/gpu-runner}
+      - LOG_FILE=${LOG_FILE:-server.log}
     depends_on:
       - redis
     env_file:
       - .env
+
 volumes:
   jobdata:
   jobvolumes:

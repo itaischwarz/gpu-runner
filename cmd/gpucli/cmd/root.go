@@ -24,5 +24,10 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&server, "server", "http://0.0.0.0:8080", "GPU runner server URL")
+	// Get default from environment variable, fallback to localhost
+	defaultServer := os.Getenv("GPU_RUNNER_SERVER")
+	if defaultServer == "" {
+		defaultServer = "http://0.0.0.0:8080"
+	}
+	rootCmd.PersistentFlags().StringVar(&server, "server", defaultServer, "GPU runner server URL (env: GPU_RUNNER_SERVER)")
 }

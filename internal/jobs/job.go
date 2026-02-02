@@ -9,6 +9,8 @@ type JobStatus string
 
 type JobStorage int
 
+type JobPriority string 
+
 type Job struct {
 	ID           string            `json:"id"`
 	Command      string            `json:"command"`
