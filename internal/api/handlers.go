@@ -27,6 +27,27 @@ type Handlers struct {
 	QuitFunction context.CancelFunc
 }
 
+func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	health := map[string]interface{}{
+		"status": "ok",
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := h.Client.Raw().Ping(ctx).Err(); err != nil {
+		health["status"] = "degraded"
+		health["redis"] = "unreachable"
+		w.WriteHeader(http.StatusServiceUnavailable)
+	} else {
+		health["redis"] = "connected"
+		w.WriteHeader(http.StatusOK)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(health)
+}
+
 func NewHandlers(queue *jobs.JobQueue, store *store.JobStore, context context.Context, streamSink *redis.StreamSink, client *redis.Client, quit context.CancelFunc) *Handlers {
 		dirs := []string{
       "/var/lib/jobrunner/volumes/10mb",
