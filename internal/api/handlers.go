@@ -8,6 +8,7 @@ import (
 	"gpu-runner/internal/store"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"gpu-runner/internal/redis"
@@ -27,6 +28,16 @@ type Handlers struct {
 }
 
 func NewHandlers(queue *jobs.JobQueue, store *store.JobStore, context context.Context, streamSink *redis.StreamSink, client *redis.Client, quit context.CancelFunc) *Handlers {
+		dirs := []string{
+      "/var/lib/jobrunner/volumes/10mb",
+      "/var/lib/jobrunner/volumes/25mb",
+      "/var/lib/jobrunner/volumes/50mb",
+  }
+	for _, dir := range dirs{
+		if err := os.Mkdir(dir, 0755); err != nil{
+			ServerLogger.Error("Failed to Create Storage Directory", "Directory", dir)
+		}
+	}
 	return &Handlers{
 		Queue:      queue,
 		JobStore:   store,
@@ -35,6 +46,8 @@ func NewHandlers(queue *jobs.JobQueue, store *store.JobStore, context context.Co
 		Client:     client,
 		QuitFunction: quit, 
 	}
+
+
 }
 
 func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +196,8 @@ func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
 	ServerLogger.Info("Received get job request", "job_id", id, "remote_addr", r.RemoteAddr)
 
 	job, err := h.JobStore.GetJob(id)
+	job.Log = h.getJobLogs(id)
+
 	if err != nil {
 		ServerLogger.Error("Failed to fetch job from database", "error", err, "job_id", id)
 		http.Error(w, "job not found", http.StatusNotFound)
@@ -233,4 +248,35 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 			}
 		}
 	}()
+}
+
+
+func (h *Handlers) getJobLogs (jobID string) string {
+	streamKey := "gpu-runner:logs:" + jobID
+	ctx := context.Background()
+	entries, err := h.Client.Raw().XRange(ctx, streamKey, "-", "+").Result()
+	ServerLogger.Info("entries", entries)
+  if err != nil {
+      ServerLogger.Error("Failed to fetch logs", "Error", err, "job_id", jobID)
+			return ""
+  }
+	var logs []map[string]interface{}
+  for _, entry := range entries {
+        if msg, ok := entry.Values["message"].(string); ok {
+            var logEntry map[string]interface{}
+            if err := json.Unmarshal([]byte(msg), &logEntry); err == nil {
+                logs = append(logs, logEntry)
+						} else {
+                ServerLogger.Warn("Failed to unmarshal log entry", "error", err, "job_id", jobID, "message", msg)
+            }
+
+            }
+        }
+
+	if len(logs) == 0{
+		ServerLogger.Info("No logs found for job", "job_id", jobID)
+	}
+	logByte, err := json.Marshal(logs)
+
+	return string(logByte)
 }

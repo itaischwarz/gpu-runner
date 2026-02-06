@@ -16,6 +16,7 @@ type Job struct {
 	Command      string            `json:"command"`
 	Status       JobStatus         `json:"status"`
 	Logger       *logger.JobLogger `json:"logger"`
+	Log 		      string 					 `json:"log"`
 	CreatedAt    time.Time         `json:"created_at"`
 	StorageBytes JobStorage        `json:"storage"`
 	VolumePath   string            `json:"volume_path"`

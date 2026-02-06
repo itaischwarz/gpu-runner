@@ -14,6 +14,14 @@ var rootCmd = &cobra.Command{
 	Short: "CLI to submit, check, and cancel GPU jobs",
 }
 
+var interactiveCmd = &cobra.Command{
+    Use:   "interactive",
+    Short: "Run interactive menu mode",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        return runInteractiveMode()
+    },
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -30,4 +38,7 @@ func init() {
 		defaultServer = "http://0.0.0.0:8080"
 	}
 	rootCmd.PersistentFlags().StringVar(&server, "server", defaultServer, "GPU runner server URL (env: GPU_RUNNER_SERVER)")
+	
+	rootCmd.AddCommand(interactiveCmd)
+
 }
