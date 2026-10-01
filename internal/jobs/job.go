@@ -9,7 +9,10 @@ type JobStatus string
 
 type JobStorage int
 
-type JobPriority string 
+type JobPriority string
+
+// JobResource selects which pool (infrastructure) a job runs on.
+type JobResource string
 
 type Job struct {
 	ID           string            `json:"id"`

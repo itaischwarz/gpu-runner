@@ -29,7 +29,12 @@ const (
 	StatusCancelled JobStatus = "cancelled"
 )
 
-const (     
+const (
+	ResourceCPU JobResource = "cpu"
+	ResourceGPU JobResource = "gpu"
+)
+
+const (
 	ImmediatePriority JobPriority = "highest"
  	HighPriority JobPriority = "high"
 	MediumPriority JobPriority = "medium"
