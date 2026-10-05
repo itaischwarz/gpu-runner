@@ -289,3 +289,82 @@ func TestCancelNonExistentJobFails(t *testing.T) {
 		t.Fatal("expected error when cancelling a non-existent job")
 	}
 }
+
+func TestMemoryMBRoundTrip(t *testing.T) {
+	s := setupTestStore(t)
+
+	job := &jobs.Job{Command: "python train.py", Status: jobs.StatusPending, MemoryMB: 30000}
+	if err := s.CreateJob(job); err != nil {
+		t.Fatalf("CreateJob failed: %v", err)
+	}
+
+	got, err := s.GetJob(job.ID)
+	if err != nil {
+		t.Fatalf("GetJob failed: %v", err)
+	}
+	if got.MemoryMB != 30000 {
+		t.Errorf("expected memory 30000, got %d", got.MemoryMB)
+	}
+
+	list, err := s.ListJobs("")
+	if err != nil {
+		t.Fatalf("ListJobs failed: %v", err)
+	}
+	if len(list) != 1 || list[0].MemoryMB != 30000 {
+		t.Errorf("unexpected ListJobs result: %+v", list)
+	}
+}
+
+func TestNewJobStoreAddsMemoryColumnToExistingDatabase(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-jobs-old-*.db")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	tmpFile.Close()
+	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+
+	// Create a database with the schema from before the memory column existed.
+	old, err := NewJobStore(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("failed to create job store: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE jobs`,
+		`CREATE TABLE jobs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			command TEXT NOT NULL,
+			status TEXT NOT NULL,
+			storage_bytes INTEGER,
+			volume_path TEXT,
+			created_at DATETIME,
+			started_at DATETIME,
+			finished_at DATETIME,
+			exit_code INTEGER
+		)`,
+		`INSERT INTO jobs (command, status, storage_bytes, volume_path, created_at, started_at, finished_at)
+			VALUES ('echo old', 'success', 0, '', CURRENT_TIMESTAMP, '', '')`,
+	} {
+		if _, err := old.DB.Exec(stmt); err != nil {
+			t.Fatalf("failed to set up old schema: %v", err)
+		}
+	}
+	old.DB.Close()
+
+	s, err := NewJobStore(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("failed to reopen job store: %v", err)
+	}
+	t.Cleanup(func() { s.DB.Close() })
+
+	got, err := s.GetJob("1")
+	if err != nil {
+		t.Fatalf("GetJob on migrated database failed: %v", err)
+	}
+	if got.Command != "echo old" || got.MemoryMB != 0 {
+		t.Errorf("unexpected migrated job: %+v", got)
+	}
+
+	if err := s.CreateJob(&jobs.Job{Command: "echo new", Status: jobs.StatusPending, MemoryMB: 1024}); err != nil {
+		t.Fatalf("CreateJob on migrated database failed: %v", err)
+	}
+}

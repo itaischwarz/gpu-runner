@@ -306,3 +306,17 @@ func TestShutdownEndpointWithAuth(t *testing.T) {
 		t.Error("QuitFunction should not be called with invalid token")
 	}
 }
+
+func TestCreateJobRejectsNegativeMemory(t *testing.T) {
+	h := setupTestHandlers(t)
+
+	body := bytes.NewBufferString(`{"command": "echo hi", "memory_mb": -1}`)
+	req := httptest.NewRequest("POST", "/jobs", body)
+	rr := httptest.NewRecorder()
+
+	h.CreateJob(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", rr.Code)
+	}
+}

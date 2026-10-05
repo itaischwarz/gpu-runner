@@ -24,6 +24,25 @@ func NewStreamSink(client *Client) *StreamSink {
 	return &StreamSink{client: client}
 }
 
+// healthStreamKey is read by Health. It never needs to exist: XLEN on a
+// missing stream returns 0, which is enough to show stream commands work.
+const healthStreamKey = LogStreamPrefix + "health"
+
+// Health returns an error unless Redis is reachable and answers stream commands.
+func (s *StreamSink) Health(ctx context.Context) error {
+	if err := s.client.Health(ctx); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
+	defer cancel()
+
+	if err := s.client.rdb.XLen(ctx, healthStreamKey).Err(); err != nil {
+		return fmt.Errorf("redis streams unavailable: %w", err)
+	}
+	return nil
+}
+
 // streamKey returns the Redis key for a job's log stream
 func streamKey(jobID string) string {
 	return LogStreamPrefix + jobID

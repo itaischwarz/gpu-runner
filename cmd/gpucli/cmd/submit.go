@@ -13,7 +13,7 @@ import (
 )
 
 // submitJob contains the actual logic for submitting a job
-func submitJob(command string, storage string, maxRetriesStr string) error {
+func submitJob(command string, storage string, maxRetriesStr string, memoryStr string) error {
     storageInt := 0
     var err error
     if len(storage) != 0 {
@@ -31,7 +31,15 @@ func submitJob(command string, storage string, maxRetriesStr string) error {
         }
     }
 
-    body := map[string]any{"command": command, "storage": storageInt, "max_retries": maxRetries}
+    memoryMB := 0
+    if memoryStr != "" {
+        memoryMB, err = strconv.Atoi(memoryStr)
+        if err != nil {
+            return fmt.Errorf("invalid memory value '%s': must be an integer (MB)", memoryStr)
+        }
+    }
+
+    body := map[string]any{"command": command, "storage": storageInt, "max_retries": maxRetries, "memory_mb": memoryMB}
 
     data, err := json.Marshal(body)
     if err != nil {
@@ -69,7 +77,8 @@ var submitCmd = &cobra.Command{
         command, _ := cmd.Flags().GetString("cmd")
         storage, _ := cmd.Flags().GetString("storage")
         maxRetriesStr, _ := cmd.Flags().GetString("maxRetries")
-        return submitJob(command, storage, maxRetriesStr)
+        memory, _ := cmd.Flags().GetString("memory")
+        return submitJob(command, storage, maxRetriesStr, memory)
     },
 }
 
@@ -78,6 +87,7 @@ func init() {
     submitCmd.MarkFlagRequired("cmd")
     submitCmd.Flags().String("storage", "", "Storage for Job")
     submitCmd.Flags().String("maxRetries", "", "Attempts running a job")
+    submitCmd.Flags().String("memory", "", "GPU memory the job needs, in MB")
 
     rootCmd.AddCommand(submitCmd)
 }

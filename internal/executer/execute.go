@@ -32,6 +32,12 @@ func (e *Executor) GetJobTimeout() time.Duration {
 }
 
 func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger) (string, error) {
+	return e.RunJobWithEnv(command, jobID, volumePath, ctx, jobLogger, nil)
+}
+
+// RunJobWithEnv runs a job with extraEnv added to its environment, e.g.
+// CUDA_VISIBLE_DEVICES to pin it to one GPU.
+func (e *Executor) RunJobWithEnv(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger, extraEnv []string) (string, error) {
 	defer e.RemoveCancelFunc(jobID)
 
 	executorLogger.Info("Setting up command execution environment", "volume_path", volumePath)
@@ -43,6 +49,7 @@ func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context
 		"USER=jobrunner",
 		fmt.Sprintf("PATH=%s:%s", volumePath, os.Getenv("PATH")),
 	)
+	cmd.Env = append(cmd.Env, extraEnv...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

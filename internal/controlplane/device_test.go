@@ -1,4 +1,4 @@
-package gpu
+package controlplane
 
 import (
 	"context"
@@ -11,7 +11,7 @@ func TestParseHealthyGPUs(t *testing.T) {
 	out := "GPU-aaa, NVIDIA A100-SXM4-80GB, 81920, 80000\n" +
 		"GPU-bbb, NVIDIA GeForce RTX 4090, 24564, 1200\n"
 
-	devices, err := parse(out)
+	devices, err := parseNvidiaSMI(out)
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestParseUnreadableMemoryIsUnhealthy(t *testing.T) {
 	out := "GPU-aaa, NVIDIA A100, [N/A], [N/A]\n" +
 		"GPU-bbb, NVIDIA A100, 81920, [GPU requires reset]\n"
 
-	devices, err := parse(out)
+	devices, err := parseNvidiaSMI(out)
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestParseSkipsRowsWithoutUUIDOrWrongColumns(t *testing.T) {
 		"GPU-bbb, NVIDIA A100, 81920\n" +
 		"[N/A], NVIDIA A100, 81920, 80000\n"
 
-	devices, err := parse(out)
+	devices, err := parseNvidiaSMI(out)
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestParseSkipsRowsWithoutUUIDOrWrongColumns(t *testing.T) {
 }
 
 func TestParseEmptyOutput(t *testing.T) {
-	devices, err := parse("")
+	devices, err := parseNvidiaSMI("")
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
@@ -82,25 +82,25 @@ func fakeSMI(t *testing.T, script string) string {
 	return path
 }
 
-func TestQueryRunsNvidiaSMI(t *testing.T) {
+func TestQueryGPUsRunsNvidiaSMI(t *testing.T) {
 	smi := fakeSMI(t, `
 [ "$1" = "--query-gpu=uuid,name,memory.total,memory.free" ] || { echo "bad args: $*" >&2; exit 2; }
 [ "$2" = "--format=csv,noheader,nounits" ] || { echo "bad args: $*" >&2; exit 2; }
 echo "GPU-aaa, NVIDIA A100, 81920, 80000"`)
 
-	devices, err := Query(context.Background(), smi)
+	devices, err := QueryGPUs(context.Background(), smi)
 	if err != nil {
-		t.Fatalf("Query failed: %v", err)
+		t.Fatalf("QueryGPUs failed: %v", err)
 	}
 	if len(devices) != 1 || devices[0].UUID != "GPU-aaa" || !devices[0].Healthy {
 		t.Fatalf("unexpected devices: %+v", devices)
 	}
 }
 
-func TestQueryFailsWhenNvidiaSMIFails(t *testing.T) {
+func TestQueryGPUsFailsWhenNvidiaSMIFails(t *testing.T) {
 	smi := fakeSMI(t, `echo "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver" >&2; exit 9`)
 
-	if _, err := Query(context.Background(), smi); err == nil {
+	if _, err := QueryGPUs(context.Background(), smi); err == nil {
 		t.Fatal("expected an error when nvidia-smi exits non-zero")
 	}
 }

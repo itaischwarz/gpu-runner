@@ -51,11 +51,52 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at DATETIME,
     started_at DATETIME,
     finished_at DATETIME,
-    exit_code INTEGER
+    exit_code INTEGER,
+    memory_mb INTEGER NOT NULL DEFAULT 0
 );`
-	_, err := s.DB.Exec(schema)
-	return err
+	if _, err := s.DB.Exec(schema); err != nil {
+		return err
+	}
+	return s.addMissingColumns()
+}
 
+// addMissingColumns brings databases created before a column existed up to
+// date. CREATE TABLE IF NOT EXISTS leaves an existing table untouched, so new
+// columns have to be added explicitly.
+func (s *JobStore) addMissingColumns() error {
+	columns := []struct{ name, definition string }{
+		{"memory_mb", "INTEGER NOT NULL DEFAULT 0"},
+	}
+
+	rows, err := s.DB.Query(`PRAGMA table_info(jobs)`)
+	if err != nil {
+		return err
+	}
+	existing := make(map[string]bool)
+	for rows.Next() {
+		var (
+			cid, notNull, pk int
+			name, colType    string
+			defaultValue     sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[name] = true
+	}
+	rows.Close()
+
+	for _, c := range columns {
+		if existing[c.name] {
+			continue
+		}
+		if _, err := s.DB.Exec(fmt.Sprintf(`ALTER TABLE jobs ADD COLUMN %s %s`, c.name, c.definition)); err != nil {
+			return err
+		}
+		serverLogger.Info("Added column to jobs table", "column", c.name)
+	}
+	return nil
 }
 
 func (s *JobStore) CreateJob(j *jobs.Job) error {
@@ -65,8 +106,8 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 
 	result, err := s.DB.Exec(
 		`INSERT INTO jobs
-			(command, status, storage_bytes, volume_path, created_at, started_at, finished_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			(command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		j.Command,
 		string(j.Status),
 		j.StorageBytes,
@@ -74,6 +115,7 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 		j.CreatedAt,
 		j.StartedAt,
 		j.FinishedAt,
+		j.MemoryMB,
 	)
 
 	if err != nil {
@@ -111,7 +153,7 @@ func (s *JobStore) UpdateJob(j *jobs.Job) error {
 
 func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 	row := s.DB.QueryRow(
-		`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at
+		`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb
          FROM jobs WHERE id = ?`, id)
 
 	var j jobs.Job
@@ -125,6 +167,7 @@ func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 		&j.CreatedAt,
 		&j.StartedAt,
 		&j.FinishedAt,
+		&j.MemoryMB,
 	)
 	if err != nil {
 		serverLogger.Error("Database query failed", "error", err, "job_id", id)
@@ -140,11 +183,11 @@ func (s *JobStore) ListJobs(status string) ([]*jobs.Job, error) {
 
 	if status != "" {
 		rows, err = s.DB.Query(
-			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at
+			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb
 			 FROM jobs WHERE status = ? ORDER BY created_at DESC`, status)
 	} else {
 		rows, err = s.DB.Query(
-			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at
+			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb
 			 FROM jobs ORDER BY created_at DESC`)
 	}
 	if err != nil {
@@ -157,7 +200,7 @@ func (s *JobStore) ListJobs(status string) ([]*jobs.Job, error) {
 	for rows.Next() {
 		var j jobs.Job
 		var st string
-		if err := rows.Scan(&j.ID, &j.Command, &st, &j.StorageBytes, &j.VolumePath, &j.CreatedAt, &j.StartedAt, &j.FinishedAt); err != nil {
+		if err := rows.Scan(&j.ID, &j.Command, &st, &j.StorageBytes, &j.VolumePath, &j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.MemoryMB); err != nil {
 			serverLogger.Error("Failed to scan job row", "error", err)
 			continue
 		}

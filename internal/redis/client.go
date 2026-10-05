@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gpu-runner/internal/config"
 	"gpu-runner/internal/logger"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -42,4 +43,18 @@ func (c *Client) Close() error {
 
 func (c *Client) Raw() *redis.Client {
 	return c.rdb
+}
+
+// healthTimeout bounds a health check so a hung Redis can't hang the caller.
+const healthTimeout = 2 * time.Second
+
+// Health returns an error if Redis doesn't answer a PING.
+func (c *Client) Health(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
+	defer cancel()
+
+	if err := c.rdb.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("redis unreachable: %w", err)
+	}
+	return nil
 }

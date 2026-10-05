@@ -4,6 +4,7 @@ import (
 	"context"
 	"gpu-runner/internal/api"
 	"gpu-runner/internal/config"
+	"gpu-runner/internal/controlplane"
 	"gpu-runner/internal/executer"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
@@ -37,7 +38,23 @@ func main() {
 		"database_path", cfg.Database.Path,
 		"worker_count", cfg.Worker.Count,
 		"job_timeout", cfg.Worker.JobTimeout,
+		"gpu_enabled", cfg.GPU.Enabled,
 	)
+
+	ctx := context.Background()
+
+	if cfg.GPU.Enabled {
+		serverLogger.Info("Initializing control plane", "nvidia_smi_path", cfg.GPU.NvidiaSMIPath, "poll_interval", cfg.GPU.PollInterval)
+		cp, err := controlplane.NewControlPlane(ctx, cfg.GPU.NvidiaSMIPath, cfg.GPU.PollInterval)
+		if err != nil {
+			serverLogger.Error("Failed to initialize control plane", "error", err)
+			log.Fatalf("Failed to initialize control plane: %v", err)
+		}
+		cp.UpdateGPUHealth(ctx)
+		serverLogger.Info("Control plane started, polling GPU health")
+	} else {
+		serverLogger.Info("GPU disabled, skipping control plane")
+	}
 
 	serverLogger.Info("Initializing Redis client")
 	client, err := redis.New(&cfg.Redis)
@@ -65,8 +82,6 @@ func main() {
 
 	// Initialize volume paths
 	jobs.InitVolumePaths(&cfg.Storage)
-
-	ctx := context.Background()
 
 	serverLogger.Info("Starting Redis adapter")
 	if err := client.StartRedisAdapter(ctx, jobQueue, streamSink); err != nil {

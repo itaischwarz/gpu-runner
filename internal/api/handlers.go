@@ -87,6 +87,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Command    string          `json:"command"`
 		Storage    jobs.JobStorage `json:"storage"`
 		MaxRetries int             `json:"max_retries"`
+		MemoryMB   int             `json:"memory_mb"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &body); err != nil {
@@ -95,7 +96,13 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ServerLogger.Info("Parsed job request", "command", body.Command, "storage", body.Storage, "max_retries", body.MaxRetries)
+	ServerLogger.Info("Parsed job request", "command", body.Command, "storage", body.Storage, "max_retries", body.MaxRetries, "memory_mb", body.MemoryMB)
+
+	if body.MemoryMB < 0 {
+		ServerLogger.Error("Invalid memory requirement", "command", body.Command, "memory_mb", body.MemoryMB)
+		http.Error(w, "memory_mb cannot be negative", http.StatusBadRequest)
+		return
+	}
 
 	limits := [3]jobs.JobStorage{jobs.Volume10MB, jobs.Volume25MB, jobs.Volume50MB}
 
@@ -125,6 +132,7 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    time.Now(),
 		MaxRetries:   body.MaxRetries,
 		JobTrial:     1,
+		MemoryMB:     body.MemoryMB,
 	}
 
 	ServerLogger.Info("Creating job in database", "command", job.Command, "storage", job.StorageBytes, "volume_path", job.VolumePath)

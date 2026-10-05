@@ -182,3 +182,17 @@ func TestRunJobRemovesCancelFunc(t *testing.T) {
 		t.Error("expected cancel func to be removed after RunJob completes")
 	}
 }
+
+func TestRunJobWithEnvPassesExtraEnv(t *testing.T) {
+	e := NewExecutor(30 * time.Second)
+	jl := newTestLogger("test-env")
+
+	output, err := e.RunJobWithEnv("echo $CUDA_VISIBLE_DEVICES", "test-env", t.TempDir(), context.Background(), jl,
+		[]string{"CUDA_VISIBLE_DEVICES=GPU-aaa"})
+	if err != nil {
+		t.Fatalf("RunJobWithEnv failed: %v", err)
+	}
+	if strings.TrimSpace(output) != "GPU-aaa" {
+		t.Errorf("expected CUDA_VISIBLE_DEVICES=GPU-aaa in the job, got %q", output)
+	}
+}

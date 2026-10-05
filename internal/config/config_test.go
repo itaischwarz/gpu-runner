@@ -122,6 +122,49 @@ func TestValidate_InvalidJobTimeout(t *testing.T) {
 	}
 }
 
+func TestLoad_GPUDefaultsAndOverrides(t *testing.T) {
+	clearEnvVars()
+	defer clearEnvVars()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if cfg.GPU.Enabled {
+		t.Error("expected GPU to be disabled by default")
+	}
+	if cfg.GPU.NvidiaSMIPath != "nvidia-smi" {
+		t.Errorf("expected nvidia-smi path 'nvidia-smi', got '%s'", cfg.GPU.NvidiaSMIPath)
+	}
+	if cfg.GPU.PollInterval != 10*time.Second {
+		t.Errorf("expected GPU poll interval 10s, got %s", cfg.GPU.PollInterval)
+	}
+
+	os.Setenv("GPU_ENABLED", "true")
+	os.Setenv("NVIDIA_SMI_PATH", "/usr/bin/nvidia-smi")
+	os.Setenv("GPU_POLL_INTERVAL", "5s")
+
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if !cfg.GPU.Enabled || cfg.GPU.NvidiaSMIPath != "/usr/bin/nvidia-smi" || cfg.GPU.PollInterval != 5*time.Second {
+		t.Errorf("unexpected GPU config: %+v", cfg.GPU)
+	}
+}
+
+func TestValidate_InvalidGPUPollInterval(t *testing.T) {
+	clearEnvVars()
+	defer clearEnvVars()
+
+	os.Setenv("GPU_ENABLED", "true")
+	os.Setenv("GPU_POLL_INTERVAL", "100ms")
+
+	if _, err := Load(); err == nil {
+		t.Error("expected validation error for GPU poll interval < 1s, got nil")
+	}
+}
+
 func TestServerAddr(t *testing.T) {
 	cfg := &Config{
 		Server: ServerConfig{
@@ -145,6 +188,7 @@ func clearEnvVars() {
 		"WORKER_COUNT", "WORKER_JOB_TIMEOUT", "WORKER_QUEUE_CAPACITY", "WORKER_RESULTS_BUFFER",
 		"STORAGE_VOLUME_10MB_PATH", "STORAGE_VOLUME_25MB_PATH", "STORAGE_VOLUME_50MB_PATH",
 		"LOG_LEVEL", "LOG_DIR", "LOG_FILE",
+		"GPU_ENABLED", "NVIDIA_SMI_PATH", "GPU_POLL_INTERVAL",
 	}
 	for _, v := range vars {
 		os.Unsetenv(v)

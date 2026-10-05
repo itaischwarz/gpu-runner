@@ -10,16 +10,31 @@ var workerLogger = logger.Server
 
 type Worker struct {
 	ID       int
-	JobQueue *JobQueue
+	JobQueue *JobQueue // still provides the Executor
 	Results  chan *Job
+	Inbox    <-chan *Job // where jobs arrive; defaults to JobQueue.Queue
+	Env      []string    // extra env for every job, e.g. CUDA_VISIBLE_DEVICES=<uuid>
+	OnIdle   func()      // called after each job, e.g. to release the GPU slot
 }
 
+// NewWorker creates a worker that reads the shared JobQueue. GPU workers
+// replace Inbox, Env and OnIdle before Start.
 func NewWorker(id int, jq *JobQueue, results chan *Job) *Worker {
 	workerLogger.Info("Creating new worker", "worker_id", id)
 	return &Worker{
 		ID:       id,
 		JobQueue: jq,
 		Results:  results,
+		Inbox:    jq.Queue,
+	}
+}
+
+// finish reports the job's result, then tells whoever owns this worker's
+// slot that it is free again.
+func (w *Worker) finish(job *Job) {
+	w.Results <- job
+	if w.OnIdle != nil {
+		w.OnIdle()
 	}
 }
 
@@ -31,7 +46,12 @@ func (w *Worker) Start(ctx context.Context) {
 			case <-ctx.Done():
 				workerLogger.Info("Worker shutting down", "worker_id", w.ID)
 				return
-			case job := <-w.JobQueue.Queue:
+			case job, ok := <-w.Inbox:
+				if !ok {
+					// The inbox was closed on shutdown; a nil job would panic below.
+					workerLogger.Info("Worker inbox closed, shutting down", "worker_id", w.ID)
+					return
+				}
 				job.Status = StatusRunning
 				workerLogger.Info("Worker received job from queue", "worker_id", w.ID, "job_id", job.ID, "status", job.Status)
 				job.Logger.Info("Job Running", logger.Item("Job Status", job.Status), logger.Item("worker", w.ID), logger.Item("command", job.Command))
@@ -43,7 +63,7 @@ func (w *Worker) Start(ctx context.Context) {
 				w.JobQueue.Executor.SetCancelFunc(job.ID, cancel)
 
 				workerLogger.Info("Executing job command", "worker_id", w.ID, "job_id", job.ID)
-				output, err := w.JobQueue.Executor.RunJob(job.Command, job.ID, volumePath, jobCtx, *job.Logger)
+				output, err := w.JobQueue.Executor.RunJobWithEnv(job.Command, job.ID, volumePath, jobCtx, *job.Logger, w.Env)
 
 				if err != nil {
 					job.Status = StatusFailed
@@ -53,7 +73,7 @@ func (w *Worker) Start(ctx context.Context) {
 						logger.Item("volume_path", volumePath),
 						logger.Item("job_id", job.ID),
 					)
-					w.Results <- job
+					w.finish(job)
 					continue
 				}
 
@@ -61,7 +81,7 @@ func (w *Worker) Start(ctx context.Context) {
 				time.Sleep(1 * time.Second)
 				job.Status = StatusSuccess
 				job.Logger.Info("Completed job", logger.Item("status", job.Status), logger.Item("worker_id", w.ID), logger.Item("command", job.Command))
-				w.Results <- job
+				w.finish(job)
 			}
 		}
 	}()

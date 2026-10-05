@@ -118,6 +118,15 @@ func PromptStorage() (string, error) {
 	return storage, err 
 }
 
+func PromptMemory() (string, error) {
+	var memory string
+	prompt := &survey.Input{
+		Message: "Enter GPU memory needed (MB):",
+	}
+	err := survey.AskOne(prompt, &memory)
+	return memory, err
+}
+
 func PromptMaxRetries() (string, error) {
 	var maxRetries string 
 	prompt := &survey.Input{

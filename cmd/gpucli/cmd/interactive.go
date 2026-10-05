@@ -92,7 +92,19 @@ func handleStartAction() error {
     }
 
 
-    return submitJob(command, storage, maxRetries)
+    memory := ""
+    confirm, err = ui.PromptForConfirmation("Would you like to specify GPU memory?")
+    if err != nil {
+        return err
+    }
+    if confirm {
+        memory, err = ui.PromptMemory()
+        if err != nil {
+            return err
+        }
+    }
+
+    return submitJob(command, storage, maxRetries, memory)
 }
 
 func handleStopAction() error {

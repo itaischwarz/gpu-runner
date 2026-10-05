@@ -16,6 +16,7 @@ type Config struct {
 	Worker   WorkerConfig
 	Storage  StorageConfig
 	Logger   LoggerConfig
+	GPU      GPUConfig
 }
 
 // ServerConfig holds HTTP server configuration
@@ -53,6 +54,13 @@ type StorageConfig struct {
 	Volume10MBPath string
 	Volume25MBPath string
 	Volume50MBPath string
+}
+
+// GPUConfig holds GPU control plane configuration
+type GPUConfig struct {
+	Enabled       bool
+	NvidiaSMIPath string
+	PollInterval  time.Duration
 }
 
 // LoggerConfig holds logging configuration
@@ -97,6 +105,11 @@ func Load() (*Config, error) {
 			LogDir:  getEnv("LOG_DIR", filepath.Join(os.Getenv("HOME"), "log", "gpu-runner")),
 			LogFile: getEnv("LOG_FILE", "server.log"),
 		},
+		GPU: GPUConfig{
+			Enabled:       getEnvAsBool("GPU_ENABLED", false),
+			NvidiaSMIPath: getEnv("NVIDIA_SMI_PATH", "nvidia-smi"),
+			PollInterval:  getEnvAsDuration("GPU_POLL_INTERVAL", 10*time.Second),
+		},
 	}
 
 	// Validate configuration
@@ -133,6 +146,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("storage volume paths cannot be empty")
 	}
 
+	if c.GPU.Enabled && c.GPU.PollInterval < 1*time.Second {
+		return fmt.Errorf("GPU_POLL_INTERVAL must be at least 1s, got %s", c.GPU.PollInterval)
+	}
+
 	return nil
 }
 
@@ -157,6 +174,19 @@ func getEnvAsInt(key string, defaultValue int) int {
 	}
 
 	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
 		return defaultValue
 	}
