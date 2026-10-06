@@ -58,6 +58,9 @@ func NewDispatcher(ctx context.Context, cp ControlPlane) *Dispatcher {
 	release := make(chan finished)
 	polled := make(chan *jobs.Job)
 	inboxes := make(map[string] chan *jobs.Job)
+	for _, s := range cp.slotTable.Snapshot() {
+		inboxes[s.ID] = make(chan *jobs.Job, 1)
+	}
 	return &Dispatcher{available: available, released: release, polled: polled, inboxes: inboxes, controlplane: cp}
 }
 
@@ -97,6 +100,21 @@ func(d *Dispatcher) Dispatch(ctx context.Context) {
 
 func (d *Dispatcher) Inbox() map[string] chan *jobs.Job {
 	return d.inboxes
+}
+
+
+// Available returns the idle, healthy slots with at least memoryMB free, for
+// the queue to place a job of that size.
+func (d *Dispatcher) Available(memoryMB int) []queue.Offer {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	offers := make([]queue.Offer, 0, len(d.available))
+	for id, mem := range d.available {
+		if mem >= memoryMB {
+			offers = append(offers, queue.Offer{SlotID: id, FreeMemoryMB: mem})
+		}
+	}
+	return offers
 }
 
 

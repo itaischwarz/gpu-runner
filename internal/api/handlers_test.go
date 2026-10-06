@@ -320,3 +320,18 @@ func TestCreateJobRejectsNegativeMemory(t *testing.T) {
 		t.Errorf("expected status 400, got %d", rr.Code)
 	}
 }
+
+func TestCreateJobRequiresMemory(t *testing.T) {
+	h := setupTestHandlers(t)
+
+	for _, body := range []string{`{"command": "echo hi"}`, `{"command": "echo hi", "memory_mb": 0}`} {
+		req := httptest.NewRequest("POST", "/jobs", bytes.NewBufferString(body))
+		rr := httptest.NewRecorder()
+
+		h.CreateJob(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("body %s: expected status 400, got %d", body, rr.Code)
+		}
+	}
+}

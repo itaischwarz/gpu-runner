@@ -5,47 +5,50 @@ import (
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
 	"sort"
+	"time"
 )
 
 var queueLogger = logger.Server
 
-// Offer is free capacity on a slot, reported by the dispatcher.
+// Offer is free capacity on a slot.
 type Offer struct {
 	SlotID       string
 	FreeMemoryMB int
 }
 
-// Placer starts a chosen job on a slot. The control plane's dispatcher
-// implements it; the queue never imports the control plane.
-type Placer interface {
+// Dispatcher is what the queue needs from the control plane's dispatcher. The
+// queue calls it; the dispatcher never calls the queue.
+type Dispatcher interface {
+	// Available returns the slots that can take a job of memoryMB right now.
+	Available(memoryMB int) []Offer
 	// Place starts job on slotID. It returns an error if the slot can no
-	// longer take the job, e.g. it went unhealthy after the offer was made.
-	// Place is called from the queue's goroutine, so it must not call
-	// Queue.Offer synchronously.
+	// longer take the job, e.g. it went unhealthy since Available.
 	Place(slotID string, job *jobs.Job) error
 }
 
-// Queue holds waiting jobs and decides which one runs when capacity frees up.
-// Jobs arrive on intake (from the Redis adapter) and capacity arrives as
-// offers (from the dispatcher). A single goroutine owns pending and open, so
-// neither needs a lock.
+// Queue holds waiting jobs and decides which one runs next. It matches jobs to
+// free slots whenever a job arrives, when Wake is called (e.g. a job just
+// finished), and on a fallback timer that catches slots that recovered. A
+// single goroutine owns pending, so it needs no lock.
 type Queue struct {
-	intake chan *jobs.Job
-	offers chan Offer
-	placer Placer
-	policy Policy
+	intake     chan *jobs.Job
+	wake       chan struct{}
+	dispatcher Dispatcher
+	policy     Policy
+	recheck    time.Duration
 
-	pending []*jobs.Job      // waiting jobs, in arrival order
-	open    map[string]Offer // slot ID → latest unused offer
+	pending []*jobs.Job // waiting jobs, in arrival order
 }
 
-func New(placer Placer, policy Policy, size int) *Queue {
+// New creates a queue. recheck is how often it retries matching without being
+// woken; 0 disables the timer.
+func New(dispatcher Dispatcher, policy Policy, size int, recheck time.Duration) *Queue {
 	return &Queue{
-		intake: make(chan *jobs.Job, size),
-		offers: make(chan Offer, size),
-		placer: placer,
-		policy: policy,
-		open:   make(map[string]Offer),
+		intake:     make(chan *jobs.Job, size),
+		wake:       make(chan struct{}, 1),
+		dispatcher: dispatcher,
+		policy:     policy,
+		recheck:    recheck,
 	}
 }
 
@@ -55,16 +58,25 @@ func (q *Queue) Intake() chan *jobs.Job {
 	return q.intake
 }
 
-// Offer reports free capacity on a slot. The dispatcher calls it at startup,
-// when a job finishes, and when a poll shows a slot changed.
-func (q *Queue) Offer(o Offer) {
-	q.offers <- o
+// Wake asks the queue to try matching again, e.g. because a slot was released.
+// It never blocks, and several calls before the queue runs collapse into one.
+func (q *Queue) Wake() {
+	select {
+	case q.wake <- struct{}{}:
+	default:
+	}
 }
 
-// Start runs the queue until ctx is cancelled. Every new job or offer
-// triggers a matching pass.
+// Start runs the queue until ctx is cancelled.
 func (q *Queue) Start(ctx context.Context) {
 	go func() {
+		var tick <-chan time.Time
+		if q.recheck > 0 {
+			ticker := time.NewTicker(q.recheck)
+			defer ticker.Stop()
+			tick = ticker.C
+		}
+
 		intake := q.intake
 		for {
 			select {
@@ -79,45 +91,45 @@ func (q *Queue) Start(ctx context.Context) {
 				}
 				q.pending = append(q.pending, job)
 				queueLogger.Info("Job queued", "job_id", job.ID, "memory_mb", job.MemoryMB, "pending", len(q.pending))
-			case offer := <-q.offers:
-				q.open[offer.SlotID] = offer
+			case <-q.wake:
+			case <-tick:
 			}
 			q.match()
 		}
 	}()
 }
 
-// match asks the policy to fill each open offer. Offers are considered
-// smallest first, so small jobs land on small slots before the large slots
-// that big jobs need are handed out.
+// match tries each pending job, in policy order, on the slots that fit it.
+// Among those, the smallest slot is tried first, so big slots stay free for
+// big jobs. A job that fits nowhere stays pending.
 func (q *Queue) match() {
-	for _, offer := range q.openBySize() {
-		if len(q.pending) == 0 {
-			return
-		}
-		i := q.policy.Pick(q.pending, offer)
-		if i < 0 {
-			continue
-		}
-		job := q.pending[i]
-		delete(q.open, offer.SlotID)
-
-		if err := q.placer.Place(offer.SlotID, job); err != nil {
-			// The offer is stale. Drop it and keep the job; the dispatcher
-			// offers the slot again when it changes.
-			queueLogger.Warn("Offer rejected, dropping it", "slot_id", offer.SlotID, "job_id", job.ID, "error", err)
-			continue
-		}
-		q.pending = append(q.pending[:i], q.pending[i+1:]...)
-		queueLogger.Info("Job placed", "job_id", job.ID, "slot_id", offer.SlotID, "memory_mb", job.MemoryMB, "free_memory_mb", offer.FreeMemoryMB)
+	if len(q.pending) == 0 {
+		return
 	}
+	placed := make(map[*jobs.Job]bool)
+	for _, job := range q.policy.Order(q.pending) {
+		for _, offer := range bySize(q.dispatcher.Available(job.MemoryMB)) {
+			if err := q.dispatcher.Place(offer.SlotID, job); err != nil {
+				// The slot changed since Available; try the next one.
+				queueLogger.Warn("Placement rejected", "slot_id", offer.SlotID, "job_id", job.ID, "error", err)
+				continue
+			}
+			placed[job] = true
+			queueLogger.Info("Job placed", "job_id", job.ID, "slot_id", offer.SlotID, "memory_mb", job.MemoryMB, "free_memory_mb", offer.FreeMemoryMB)
+			break
+		}
+	}
+
+	remaining := q.pending[:0]
+	for _, job := range q.pending {
+		if !placed[job] {
+			remaining = append(remaining, job)
+		}
+	}
+	q.pending = remaining
 }
 
-func (q *Queue) openBySize() []Offer {
-	offers := make([]Offer, 0, len(q.open))
-	for _, o := range q.open {
-		offers = append(offers, o)
-	}
+func bySize(offers []Offer) []Offer {
 	sort.Slice(offers, func(i, j int) bool {
 		if offers[i].FreeMemoryMB != offers[j].FreeMemoryMB {
 			return offers[i].FreeMemoryMB < offers[j].FreeMemoryMB

@@ -98,9 +98,9 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 
 	ServerLogger.Info("Parsed job request", "command", body.Command, "storage", body.Storage, "max_retries", body.MaxRetries, "memory_mb", body.MemoryMB)
 
-	if body.MemoryMB < 0 {
+	if body.MemoryMB <= 0 {
 		ServerLogger.Error("Invalid memory requirement", "command", body.Command, "memory_mb", body.MemoryMB)
-		http.Error(w, "memory_mb cannot be negative", http.StatusBadRequest)
+		http.Error(w, "memory_mb is required and must be a positive number of MB", http.StatusBadRequest)
 		return
 	}
 

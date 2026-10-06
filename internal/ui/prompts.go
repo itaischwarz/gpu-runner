@@ -123,7 +123,7 @@ func PromptMemory() (string, error) {
 	prompt := &survey.Input{
 		Message: "Enter GPU memory needed (MB):",
 	}
-	err := survey.AskOne(prompt, &memory)
+	err := survey.AskOne(prompt, &memory, survey.WithValidator(survey.Required))
 	return memory, err
 }
 

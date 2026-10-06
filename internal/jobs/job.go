@@ -27,7 +27,7 @@ type Job struct {
 	FinishedAt   string            `json:"finished_at"`
 	MaxRetries   int               `json:"max_retries"`
 	JobTrial     int               `json:"job_trial"`
-	// MemoryMB is the GPU memory the job asks for; the dispatcher only places
-	// it on a GPU with at least this much free. 0 means no requirement.
+	// MemoryMB is the GPU memory the job asks for, set by the user and
+	// required. The dispatcher only places it on a GPU with at least this much free.
 	MemoryMB int `json:"memory_mb"`
 }
