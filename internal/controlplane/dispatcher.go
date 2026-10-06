@@ -68,18 +68,26 @@ func(d *Dispatcher) Dispatch(ctx context.Context) {
 		for{
 			select{
 			case jobFinished := <- d.released:
-				// TODO: doesn't compile as written: queue.Offer is a type, not a
-				// function, and a job has no FreeMemoryMB.
-				// queue.Offer(jobFinished.slot_id, jobFinished.job.FreeMemoryMB)
-				_ = jobFinished
-			case size := <- d.polled:
-				// TODO: doesn't compile as written: size is a *jobs.Job, and
-				// queue.Place and memory don't exist.
-				// bestGPU, bestMemory := d.SearchGPUs()
-				// if size > bestMemory{
-				// 	queue.Place(bestGPU, memory)
-				// }
-				_ = size
+				// The slot is free again: re-read its free memory and make it
+				// available, unless it went unhealthy while the job ran.
+				free := d.controlplane.PollFreeMemory(ctx)
+				d.mu.Lock()
+				if mem, healthy := free[jobFinished.slotID]; healthy {
+					d.available[jobFinished.slotID] = mem
+				}
+				d.mu.Unlock()
+			case <- d.polled:
+				// Refresh free memory for idle slots and drop any that went unhealthy.
+				free := d.controlplane.PollFreeMemory(ctx)
+				d.mu.Lock()
+				for slotID := range d.available {
+					if mem, healthy := free[slotID]; healthy {
+						d.available[slotID] = mem
+					} else {
+						delete(d.available, slotID)
+					}
+				}
+				d.mu.Unlock()
 			case <- ctx.Done(): return
 			}
 		}
