@@ -278,6 +278,10 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 						ServerLogger.Error("Failed to acknowledge job", "error", err, "job_id", res.ID)
 					}
 				case jobs.StatusFailed:
+					if res.NoRetry {
+						ServerLogger.Warn("Job failed and will not be retried", "job_id", res.ID, "error", res.Error)
+						continue
+					}
 					if res.JobTrial >= res.MaxRetries {
 						ServerLogger.Warn("Job exhausted all retries", "job_id", res.ID, "trials", res.JobTrial, "max_retries", res.MaxRetries)
 						continue

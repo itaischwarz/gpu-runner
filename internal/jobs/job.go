@@ -30,4 +30,9 @@ type Job struct {
 	// MemoryMB is the GPU memory the job asks for, set by the user and
 	// required. The dispatcher only places it on a GPU with at least this much free.
 	MemoryMB int `json:"memory_mb"`
+	// Error is why the job last failed, shown to the user by the API.
+	Error string `json:"error,omitempty"`
+	// NoRetry marks a failure that retrying can't fix, e.g. exceeding the
+	// memory request. It is only passed from the worker to the acknowledger.
+	NoRetry bool `json:"-"`
 }

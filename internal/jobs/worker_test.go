@@ -4,6 +4,7 @@ import (
 	"context"
 	"gpu-runner/internal/executer"
 	"gpu-runner/internal/logger"
+	"strings"
 	"testing"
 	"time"
 )
@@ -80,5 +81,33 @@ func waitForIdle(t *testing.T, idle chan struct{}) {
 	case <-idle:
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for OnIdle")
+	}
+}
+
+func TestWorkerMarksMemoryKillAsFailedWithoutRetry(t *testing.T) {
+	jq := NewJobQueue(1)
+	jq.Executor = executer.NewExecutor(10 * time.Second)
+	overLimit := func(ctx context.Context, pgid int) (int, error) { return 12000, nil }
+	jq.Executor.SetMemoryLimits(overLimit, 10*time.Millisecond, 2)
+
+	results := make(chan *Job, 1)
+	inbox := make(chan *Job, 1)
+	w := NewWorker(1, jq, results)
+	w.Inbox = inbox
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.Start(ctx)
+
+	job := newTestJob("hog", "sleep 30")
+	job.MemoryMB = 8000
+	inbox <- job
+
+	got := waitForResult(t, results)
+	if got.Status != StatusFailed || !got.NoRetry {
+		t.Fatalf("expected failed and not retried, got status=%s noRetry=%v", got.Status, got.NoRetry)
+	}
+	if !strings.Contains(got.Error, "GPU memory exceeded: used 12000 MB of 8000 MB requested") {
+		t.Errorf("expected the memory error on the job, got %q", got.Error)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -17,6 +18,11 @@ type Executor struct {
 	cancels    map[string]context.CancelFunc
 	mu         sync.RWMutex
 	jobTimeout time.Duration
+
+	// GPU memory enforcement; off until SetMemoryLimits is called.
+	memProbe       MemoryProbe
+	memInterval    time.Duration
+	memGraceChecks int
 }
 
 func NewExecutor(jobTimeout time.Duration) *Executor {
@@ -32,17 +38,29 @@ func (e *Executor) GetJobTimeout() time.Duration {
 }
 
 func (e *Executor) RunJob(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger) (string, error) {
-	return e.RunJobWithEnv(command, jobID, volumePath, ctx, jobLogger, nil)
+	return e.RunJobWithEnv(command, jobID, volumePath, ctx, jobLogger, nil, 0)
 }
 
 // RunJobWithEnv runs a job with extraEnv added to its environment, e.g.
-// CUDA_VISIBLE_DEVICES to pin it to one GPU.
-func (e *Executor) RunJobWithEnv(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger, extraEnv []string) (string, error) {
+// CUDA_VISIBLE_DEVICES to pin it to one GPU. If memory limits are on and
+// memoryLimitMB > 0, the job is killed when it uses more GPU memory than that.
+func (e *Executor) RunJobWithEnv(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger, extraEnv []string, memoryLimitMB int) (string, error) {
 	defer e.RemoveCancelFunc(jobID)
 
 	executorLogger.Info("Setting up command execution environment", "volume_path", volumePath)
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", command)
+	// runCtx ends the job on timeout or user cancel (via ctx) or when the
+	// memory watcher kills it.
+	runCtx, stopRun := context.WithCancel(ctx)
+	defer stopRun()
+
+	cmd := exec.CommandContext(runCtx, "bash", "-c", command)
+	// Run the job in its own process group, and kill the whole group when it
+	// ends early, so children of `bash -c` (where GPU work usually runs) die
+	// too and release their GPU memory.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = 5 * time.Second
 	cmd.Dir = volumePath
 	cmd.Env = append(
 		os.Environ(),
@@ -57,7 +75,27 @@ func (e *Executor) RunJobWithEnv(command, jobID, volumePath string, ctx context.
 
 	executorLogger.Info("Executing command", "command", command)
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
+		jobLogger.Error("Command failed to start", logger.Item("error", err))
+		return "", fmt.Errorf("command failed to start: %w", err)
+	}
+
+	memDone := make(chan *MemoryExceededError, 1)
+	if e.memProbe != nil && memoryLimitMB > 0 {
+		go e.watchMemory(runCtx, cmd.Process.Pid, memoryLimitMB, stopRun, memDone, jobID)
+	} else {
+		memDone <- nil
+	}
+
+	err := cmd.Wait()
+	stopRun() // stop the memory watcher
+	if exceeded := <-memDone; exceeded != nil {
+		executorLogger.Warn("Job killed for exceeding its GPU memory request", "job_id", jobID, "used_mb", exceeded.UsedMB, "limit_mb", exceeded.LimitMB)
+		logMemoryKill(jobLogger, exceeded)
+		return stdout.String() + stderr.String(), exceeded
+	}
+
+	if err != nil {
 		output := stdout.String() + stderr.String()
 		exitCode := "unknown"
 		if ee, ok := err.(*exec.ExitError); ok {

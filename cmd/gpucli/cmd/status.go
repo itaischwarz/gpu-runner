@@ -33,13 +33,18 @@ func checkJobStatus(jobID string) error {
         Status  string `json:"status"`
         Log     string `json:"log"`
         Command string `json:"command"`
+        Error   string `json:"error"`
     }
 
     if err := json.Unmarshal(payload, &job); err != nil {
         return fmt.Errorf("parse response: %w", err)
     }
 
-    fmt.Printf("Job: %s\nCommand: %s\nStatus: %s\nLogs:\n%s\n", job.ID, job.Command, job.Status, formatLogs(job.Log))
+    fmt.Printf("Job: %s\nCommand: %s\nStatus: %s\n", job.ID, job.Command, job.Status)
+    if job.Error != "" {
+        fmt.Printf("Error: %s\n", job.Error)
+    }
+    fmt.Printf("Logs:\n%s\n", formatLogs(job.Log))
     return nil
 }
 

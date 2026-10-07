@@ -188,7 +188,7 @@ func TestRunJobWithEnvPassesExtraEnv(t *testing.T) {
 	jl := newTestLogger("test-env")
 
 	output, err := e.RunJobWithEnv("echo $CUDA_VISIBLE_DEVICES", "test-env", t.TempDir(), context.Background(), jl,
-		[]string{"CUDA_VISIBLE_DEVICES=GPU-aaa"})
+		[]string{"CUDA_VISIBLE_DEVICES=GPU-aaa"}, 0)
 	if err != nil {
 		t.Fatalf("RunJobWithEnv failed: %v", err)
 	}

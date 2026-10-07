@@ -93,6 +93,14 @@ func main() {
 	var intake chan<- *jobs.Job
 
 	if cfg.GPU.Enabled {
+		// Kill jobs that use more GPU memory than they requested.
+		jobQueue.Executor.SetMemoryLimits(
+			executer.NvidiaSMIMemoryProbe(cfg.GPU.NvidiaSMIPath),
+			cfg.GPU.MemoryCheckInterval,
+			cfg.GPU.MemoryGraceChecks,
+		)
+		serverLogger.Info("GPU memory limits enforced", "check_interval", cfg.GPU.MemoryCheckInterval, "grace_checks", cfg.GPU.MemoryGraceChecks)
+
 		dispatcher := controlplane.NewDispatcher(ctx, *cp)
 		jobQ := queue.New(dispatcher, queue.FIFO{}, cfg.Worker.QueueCapacity, cfg.GPU.PollInterval)
 

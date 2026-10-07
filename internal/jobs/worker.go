@@ -2,6 +2,8 @@ package jobs
 
 import (
 	"context"
+	"errors"
+	"gpu-runner/internal/executer"
 	"gpu-runner/internal/logger"
 	"time"
 )
@@ -63,13 +65,19 @@ func (w *Worker) Start(ctx context.Context) {
 				w.JobQueue.Executor.SetCancelFunc(job.ID, cancel)
 
 				workerLogger.Info("Executing job command", "worker_id", w.ID, "job_id", job.ID)
-				output, err := w.JobQueue.Executor.RunJobWithEnv(job.Command, job.ID, volumePath, jobCtx, *job.Logger, w.Env)
+				output, err := w.JobQueue.Executor.RunJobWithEnv(job.Command, job.ID, volumePath, jobCtx, *job.Logger, w.Env, job.MemoryMB)
+				cancel()
 
 				if err != nil {
 					job.Status = StatusFailed
+					job.Error = err.Error()
+					var memErr *executer.MemoryExceededError
+					if errors.As(err, &memErr) {
+						job.NoRetry = true
+					}
 					workerLogger.Error("Job execution failed", "worker_id", w.ID, "job_id", job.ID, "error", err)
 					job.Logger.Error("Job did not complete successfully",
-						logger.Item("error", err),
+						logger.Item("error", err.Error()),
 						logger.Item("volume_path", volumePath),
 						logger.Item("job_id", job.ID),
 					)
@@ -80,6 +88,7 @@ func (w *Worker) Start(ctx context.Context) {
 				workerLogger.Info("Job execution completed successfully", "worker_id", w.ID, "job_id", job.ID, "output_length", len(output))
 				time.Sleep(1 * time.Second)
 				job.Status = StatusSuccess
+				job.Error = ""
 				job.Logger.Info("Completed job", logger.Item("status", job.Status), logger.Item("worker_id", w.ID), logger.Item("command", job.Command))
 				w.finish(job)
 			}

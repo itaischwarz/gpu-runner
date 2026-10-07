@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     started_at DATETIME,
     finished_at DATETIME,
     exit_code INTEGER,
-    memory_mb INTEGER NOT NULL DEFAULT 0
+    memory_mb INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT NOT NULL DEFAULT ''
 );`
 	if _, err := s.DB.Exec(schema); err != nil {
 		return err
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 func (s *JobStore) addMissingColumns() error {
 	columns := []struct{ name, definition string }{
 		{"memory_mb", "INTEGER NOT NULL DEFAULT 0"},
+		{"error_message", "TEXT NOT NULL DEFAULT ''"},
 	}
 
 	rows, err := s.DB.Query(`PRAGMA table_info(jobs)`)
@@ -136,10 +138,11 @@ func (s *JobStore) CreateJob(j *jobs.Job) error {
 func (s *JobStore) UpdateJob(j *jobs.Job) error {
 	_, err := s.DB.Exec(
 		`UPDATE jobs
-		SET finished_at = ?, status = ?
+		SET finished_at = ?, status = ?, error_message = ?
 			WHERE id = ?`,
 		j.FinishedAt,
 		j.Status,
+		j.Error,
 		j.ID,
 	)
 
@@ -153,7 +156,7 @@ func (s *JobStore) UpdateJob(j *jobs.Job) error {
 
 func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 	row := s.DB.QueryRow(
-		`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb
+		`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb, error_message
          FROM jobs WHERE id = ?`, id)
 
 	var j jobs.Job
@@ -168,6 +171,7 @@ func (s *JobStore) GetJob(id string) (*jobs.Job, error) {
 		&j.StartedAt,
 		&j.FinishedAt,
 		&j.MemoryMB,
+		&j.Error,
 	)
 	if err != nil {
 		serverLogger.Error("Database query failed", "error", err, "job_id", id)
@@ -183,11 +187,11 @@ func (s *JobStore) ListJobs(status string) ([]*jobs.Job, error) {
 
 	if status != "" {
 		rows, err = s.DB.Query(
-			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb
+			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb, error_message
 			 FROM jobs WHERE status = ? ORDER BY created_at DESC`, status)
 	} else {
 		rows, err = s.DB.Query(
-			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb
+			`SELECT id, command, status, storage_bytes, volume_path, created_at, started_at, finished_at, memory_mb, error_message
 			 FROM jobs ORDER BY created_at DESC`)
 	}
 	if err != nil {
@@ -200,7 +204,7 @@ func (s *JobStore) ListJobs(status string) ([]*jobs.Job, error) {
 	for rows.Next() {
 		var j jobs.Job
 		var st string
-		if err := rows.Scan(&j.ID, &j.Command, &st, &j.StorageBytes, &j.VolumePath, &j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.MemoryMB); err != nil {
+		if err := rows.Scan(&j.ID, &j.Command, &st, &j.StorageBytes, &j.VolumePath, &j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.MemoryMB, &j.Error); err != nil {
 			serverLogger.Error("Failed to scan job row", "error", err)
 			continue
 		}

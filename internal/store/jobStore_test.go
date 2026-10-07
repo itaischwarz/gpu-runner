@@ -368,3 +368,25 @@ func TestNewJobStoreAddsMemoryColumnToExistingDatabase(t *testing.T) {
 		t.Fatalf("CreateJob on migrated database failed: %v", err)
 	}
 }
+
+func TestJobErrorRoundTrip(t *testing.T) {
+	s := setupTestStore(t)
+
+	job := &jobs.Job{Command: "python train.py", Status: jobs.StatusPending, MemoryMB: 8000}
+	if err := s.CreateJob(job); err != nil {
+		t.Fatalf("CreateJob failed: %v", err)
+	}
+	job.Status = jobs.StatusFailed
+	job.Error = "GPU memory exceeded: used 12000 MB of 8000 MB requested"
+	if err := s.UpdateJob(job); err != nil {
+		t.Fatalf("UpdateJob failed: %v", err)
+	}
+
+	got, err := s.GetJob(job.ID)
+	if err != nil {
+		t.Fatalf("GetJob failed: %v", err)
+	}
+	if got.Error != job.Error {
+		t.Errorf("expected error %q, got %q", job.Error, got.Error)
+	}
+}

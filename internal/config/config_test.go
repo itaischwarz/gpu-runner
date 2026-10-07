@@ -139,6 +139,9 @@ func TestLoad_GPUDefaultsAndOverrides(t *testing.T) {
 	if cfg.GPU.PollInterval != 10*time.Second {
 		t.Errorf("expected GPU poll interval 10s, got %s", cfg.GPU.PollInterval)
 	}
+	if cfg.GPU.MemoryCheckInterval != 2*time.Second || cfg.GPU.MemoryGraceChecks != 2 {
+		t.Errorf("expected memory checks every 2s with 2 grace checks, got %s / %d", cfg.GPU.MemoryCheckInterval, cfg.GPU.MemoryGraceChecks)
+	}
 
 	os.Setenv("GPU_ENABLED", "true")
 	os.Setenv("NVIDIA_SMI_PATH", "/usr/bin/nvidia-smi")
@@ -189,6 +192,7 @@ func clearEnvVars() {
 		"STORAGE_VOLUME_10MB_PATH", "STORAGE_VOLUME_25MB_PATH", "STORAGE_VOLUME_50MB_PATH",
 		"LOG_LEVEL", "LOG_DIR", "LOG_FILE",
 		"GPU_ENABLED", "NVIDIA_SMI_PATH", "GPU_POLL_INTERVAL",
+		"GPU_MEMORY_CHECK_INTERVAL", "GPU_MEMORY_GRACE_CHECKS",
 	}
 	for _, v := range vars {
 		os.Unsetenv(v)

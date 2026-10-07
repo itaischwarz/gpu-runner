@@ -61,6 +61,10 @@ type GPUConfig struct {
 	Enabled       bool
 	NvidiaSMIPath string
 	PollInterval  time.Duration
+	// A job using more GPU memory than it requested for MemoryGraceChecks
+	// checks in a row, MemoryCheckInterval apart, is killed.
+	MemoryCheckInterval time.Duration
+	MemoryGraceChecks   int
 }
 
 // LoggerConfig holds logging configuration
@@ -109,6 +113,8 @@ func Load() (*Config, error) {
 			Enabled:       getEnvAsBool("GPU_ENABLED", false),
 			NvidiaSMIPath: getEnv("NVIDIA_SMI_PATH", "nvidia-smi"),
 			PollInterval:  getEnvAsDuration("GPU_POLL_INTERVAL", 10*time.Second),
+			MemoryCheckInterval: getEnvAsDuration("GPU_MEMORY_CHECK_INTERVAL", 2*time.Second),
+			MemoryGraceChecks:   getEnvAsInt("GPU_MEMORY_GRACE_CHECKS", 2),
 		},
 	}
 
@@ -148,6 +154,14 @@ func (c *Config) Validate() error {
 
 	if c.GPU.Enabled && c.GPU.PollInterval < 1*time.Second {
 		return fmt.Errorf("GPU_POLL_INTERVAL must be at least 1s, got %s", c.GPU.PollInterval)
+	}
+
+	if c.GPU.Enabled && c.GPU.MemoryCheckInterval < 100*time.Millisecond {
+		return fmt.Errorf("GPU_MEMORY_CHECK_INTERVAL must be at least 100ms, got %s", c.GPU.MemoryCheckInterval)
+	}
+
+	if c.GPU.Enabled && c.GPU.MemoryGraceChecks < 1 {
+		return fmt.Errorf("GPU_MEMORY_GRACE_CHECKS must be at least 1, got %d", c.GPU.MemoryGraceChecks)
 	}
 
 	return nil
