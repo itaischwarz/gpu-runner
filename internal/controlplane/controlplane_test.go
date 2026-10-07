@@ -34,6 +34,23 @@ func TestPollFreeMemoryReturnsHealthySlotsOnly(t *testing.T) {
 	}
 }
 
+func TestMaxMemoryMBIsLargestGPUTotal(t *testing.T) {
+	provider := &fakeProvider{slots: []Slot{
+		{ID: "GPU-a", TotalMemoryMB: 24564, FreeMemoryMB: 1000, Healthy: true},
+		{ID: "GPU-b", TotalMemoryMB: 81920, FreeMemoryMB: 1000, Healthy: false},
+	}}
+	table, err := DiscoverSlots(context.Background(), provider)
+	if err != nil {
+		t.Fatalf("DiscoverSlots failed: %v", err)
+	}
+	cp := &ControlPlane{provider: provider, slotTable: table, interval: time.Second}
+
+	// Total memory, not free memory, and regardless of health right now.
+	if got := cp.MaxMemoryMB(); got != 81920 {
+		t.Errorf("expected 81920, got %d", got)
+	}
+}
+
 func TestHealth(t *testing.T) {
 	ctx := context.Background()
 	provider := &fakeProvider{slots: []Slot{

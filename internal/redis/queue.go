@@ -125,12 +125,15 @@ func (c *Client) RequeueStaleJobs(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
-func (c *Client) StartRedisAdapter(ctx context.Context, jobQueue *jobs.JobQueue, sink *StreamSink) error {
+// StartRedisAdapter moves jobs from Redis into out until ctx is cancelled,
+// then closes out. out is the CPU workers' JobQueue.Queue, or the GPU queue's
+// Intake.
+func (c *Client) StartRedisAdapter(ctx context.Context, out chan<- *jobs.Job, sink *StreamSink) error {
 	redisLogger.Info("Starting Redis adapter", "queue", JobQueueKey)
 	go func() {
 		defer func() {
 			redisLogger.Info("Redis adapter shutting down, closing job queue")
-			close(jobQueue.Queue)
+			close(out)
 		}()
 		for {
 			select {
@@ -149,7 +152,7 @@ func (c *Client) StartRedisAdapter(ctx context.Context, jobQueue *jobs.JobQueue,
 				case <-ctx.Done():
 					redisLogger.Warn("Context cancelled while sending job to queue", "job_id", job.ID)
 					return
-				case jobQueue.Queue <- job:
+				case out <- job:
 					redisLogger.Info("Job sent to worker queue successfully", "job_id", job.ID)
 				}
 			}

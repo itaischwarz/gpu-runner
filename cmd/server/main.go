@@ -8,11 +8,13 @@ import (
 	"gpu-runner/internal/executer"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
+	"gpu-runner/internal/queue"
 	"gpu-runner/internal/redis"
 	"gpu-runner/internal/store"
 	"log"
 	"net/http"
 	"os/signal"
+	"sort"
 	"syscall"
 )
 
@@ -43,9 +45,10 @@ func main() {
 
 	ctx := context.Background()
 
+	var cp *controlplane.ControlPlane
 	if cfg.GPU.Enabled {
 		serverLogger.Info("Initializing control plane", "nvidia_smi_path", cfg.GPU.NvidiaSMIPath, "poll_interval", cfg.GPU.PollInterval)
-		cp, err := controlplane.NewControlPlane(ctx, cfg.GPU.NvidiaSMIPath, cfg.GPU.PollInterval)
+		cp, err = controlplane.NewControlPlane(ctx, cfg.GPU.NvidiaSMIPath, cfg.GPU.PollInterval)
 		if err != nil {
 			serverLogger.Error("Failed to initialize control plane", "error", err)
 			log.Fatalf("Failed to initialize control plane: %v", err)
@@ -83,24 +86,66 @@ func main() {
 	// Initialize volume paths
 	jobs.InitVolumePaths(&cfg.Storage)
 
-	serverLogger.Info("Starting Redis adapter")
-	if err := client.StartRedisAdapter(ctx, jobQueue, streamSink); err != nil {
-		serverLogger.Error("Failed to start Redis adapter", "error", err)
-		log.Fatalf("Failed to start Redis adapter: %v", err)
-	}
-
 	results := make(chan *jobs.Job, cfg.Worker.ResultsBuffer)
 	serverLogger.Info("Created results channel", "buffer_size", cfg.Worker.ResultsBuffer)
 
-	serverLogger.Info("Starting workers", "count", cfg.Worker.Count)
-	for i := 1; i <= cfg.Worker.Count; i++ {
-		worker := jobs.NewWorker(i, jobQueue, results)
-		worker.Start(ctx)
+	// Where the Redis adapter delivers jobs: the GPU queue, or the CPU workers.
+	var intake chan<- *jobs.Job
+
+	if cfg.GPU.Enabled {
+		dispatcher := controlplane.NewDispatcher(ctx, *cp)
+		jobQ := queue.New(dispatcher, queue.FIFO{}, cfg.Worker.QueueCapacity, cfg.GPU.PollInterval)
+
+		// One worker per GPU, started before the queue so every inbox has a
+		// reader before the first Place.
+		inboxes := dispatcher.Inbox()
+		slotIDs := make([]string, 0, len(inboxes))
+		for id := range inboxes {
+			slotIDs = append(slotIDs, id)
+		}
+		sort.Strings(slotIDs)
+		for i, slotID := range slotIDs {
+			worker := jobs.NewWorker(i+1, jobQueue, results)
+			worker.Inbox = inboxes[slotID]
+			worker.Env = []string{"CUDA_VISIBLE_DEVICES=" + slotID}
+			worker.OnIdle = func(job *jobs.Job) {
+				dispatcher.Release(slotID, job)
+				jobQ.Wake()
+			}
+			worker.Start(ctx)
+			serverLogger.Info("Started GPU worker", "worker_id", i+1, "slot_id", slotID)
+		}
+
+		if err := dispatcher.Start(ctx); err != nil {
+			serverLogger.Error("Failed to start dispatcher", "error", err)
+			log.Fatalf("Failed to start dispatcher: %v", err)
+		}
+		dispatcher.Dispatch(ctx)
+		jobQ.Start(ctx)
+		intake = jobQ.Intake()
+		serverLogger.Info("GPU scheduling started", "gpus", len(slotIDs))
+	} else {
+		serverLogger.Info("Starting workers", "count", cfg.Worker.Count)
+		for i := 1; i <= cfg.Worker.Count; i++ {
+			worker := jobs.NewWorker(i, jobQueue, results)
+			worker.Start(ctx)
+		}
+		intake = jobQueue.Queue
+		serverLogger.Info("All workers started successfully")
 	}
-	serverLogger.Info("All workers started successfully")
+
+	serverLogger.Info("Starting Redis adapter")
+	if err := client.StartRedisAdapter(ctx, intake, streamSink); err != nil {
+		serverLogger.Error("Failed to start Redis adapter", "error", err)
+		log.Fatalf("Failed to start Redis adapter: %v", err)
+	}
 	quitCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
 	handlers := api.NewHandlers(jobQueue, js, ctx, streamSink, client, stop)
+	if cp != nil {
+		// Reject jobs bigger than the largest GPU at submit time.
+		handlers.Capacity = cp
+	}
 	serverLogger.Info("API handlers initialized")
 
 	handlers.StartRedisAcknowledger(ctx, results)

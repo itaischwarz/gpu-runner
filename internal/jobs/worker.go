@@ -14,7 +14,7 @@ type Worker struct {
 	Results  chan *Job
 	Inbox    <-chan *Job // where jobs arrive; defaults to JobQueue.Queue
 	Env      []string    // extra env for every job, e.g. CUDA_VISIBLE_DEVICES=<uuid>
-	OnIdle   func()      // called after each job, e.g. to release the GPU slot
+	OnIdle   func(*Job)  // called after each job with that job, e.g. to release the GPU slot
 }
 
 // NewWorker creates a worker that reads the shared JobQueue. GPU workers
@@ -34,7 +34,7 @@ func NewWorker(id int, jq *JobQueue, results chan *Job) *Worker {
 func (w *Worker) finish(job *Job) {
 	w.Results <- job
 	if w.OnIdle != nil {
-		w.OnIdle()
+		w.OnIdle(job)
 	}
 }
 

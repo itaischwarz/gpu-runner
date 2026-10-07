@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -333,5 +334,26 @@ func TestCreateJobRequiresMemory(t *testing.T) {
 		if rr.Code != http.StatusBadRequest {
 			t.Errorf("body %s: expected status 400, got %d", body, rr.Code)
 		}
+	}
+}
+
+type fakeCapacity int
+
+func (c fakeCapacity) MaxMemoryMB() int { return int(c) }
+
+func TestCreateJobRejectsJobLargerThanBiggestGPU(t *testing.T) {
+	h := setupTestHandlers(t)
+	h.Capacity = fakeCapacity(81920)
+
+	req := httptest.NewRequest("POST", "/jobs", bytes.NewBufferString(`{"command": "echo hi", "memory_mb": 500000}`))
+	rr := httptest.NewRecorder()
+
+	h.CreateJob(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "exceeds the largest GPU (81920 MB)") {
+		t.Errorf("expected the limit in the error, got %q", rr.Body.String())
 	}
 }

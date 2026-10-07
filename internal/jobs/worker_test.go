@@ -26,7 +26,7 @@ func TestGPUWorkerRunsInboxJobsWithEnvThenCallsOnIdle(t *testing.T) {
 	w := NewWorker(1, jq, results)
 	w.Inbox = inbox
 	w.Env = []string{"CUDA_VISIBLE_DEVICES=GPU-aaa"}
-	w.OnIdle = func() { idle <- struct{}{} }
+	w.OnIdle = func(*Job) { idle <- struct{}{} }
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

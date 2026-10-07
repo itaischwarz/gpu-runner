@@ -84,7 +84,10 @@ func (l *JobLogger) Error(msg string, fields ...Field) {
 }
 
 func (l *JobLogger) log(level, msg string, fields ...Field) {
-	all := append(l.base, fields...)
+	// Copy rather than append to l.base, which may share its backing array
+	// with other loggers and log calls.
+	all := make([]Field, 0, len(l.base)+len(fields))
+	all = append(append(all, l.base...), fields...)
 
 	wire := wireLogEntry{
 		Level:     level,
@@ -109,7 +112,8 @@ func (l *JobLogger) log(level, msg string, fields ...Field) {
 
 func (l *JobLogger) With(fields ...Field) *JobLogger {
 	child := *l
-	child.base = append(l.base, fields...)
+	child.base = make([]Field, 0, len(l.base)+len(fields))
+	child.base = append(append(child.base, l.base...), fields...)
 	return &child
 }
 

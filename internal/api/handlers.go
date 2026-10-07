@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"gpu-runner/internal/jobs"
 	"gpu-runner/internal/logger"
 	"gpu-runner/internal/store"
@@ -25,6 +26,12 @@ type Handlers struct {
 	StreamSink *redis.StreamSink
 	Client     *redis.Client
 	QuitFunction context.CancelFunc
+	Capacity   Capacity // set in GPU mode; nil means no size limit
+}
+
+// Capacity reports the largest job, in MB of GPU memory, that could ever run.
+type Capacity interface {
+	MaxMemoryMB() int
 }
 
 func (h *Handlers) HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +109,16 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		ServerLogger.Error("Invalid memory requirement", "command", body.Command, "memory_mb", body.MemoryMB)
 		http.Error(w, "memory_mb is required and must be a positive number of MB", http.StatusBadRequest)
 		return
+	}
+
+	// A job bigger than the largest GPU could never be placed, so reject it
+	// now instead of letting it wait in the queue forever.
+	if h.Capacity != nil {
+		if max := h.Capacity.MaxMemoryMB(); body.MemoryMB > max {
+			ServerLogger.Error("Job exceeds GPU capacity", "command", body.Command, "memory_mb", body.MemoryMB, "max_memory_mb", max)
+			http.Error(w, fmt.Sprintf("memory_mb %d exceeds the largest GPU (%d MB)", body.MemoryMB, max), http.StatusBadRequest)
+			return
+		}
 	}
 
 	limits := [3]jobs.JobStorage{jobs.Volume10MB, jobs.Volume25MB, jobs.Volume50MB}
@@ -225,13 +242,12 @@ func (h *Handlers) GetJob(w http.ResponseWriter, r *http.Request) {
 	ServerLogger.Info("Received get job request", "job_id", id, "remote_addr", r.RemoteAddr)
 
 	job, err := h.JobStore.GetJob(id)
-	job.Log = h.getJobLogs(id)
-
 	if err != nil {
 		ServerLogger.Error("Failed to fetch job from database", "error", err, "job_id", id)
 		http.Error(w, "job not found", http.StatusNotFound)
 		return
 	}
+	job.Log = h.getJobLogs(id)
 
 	ServerLogger.Info("Successfully fetched job", "job_id", id, "status", job.Status)
 
@@ -280,32 +296,39 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 }
 
 
-func (h *Handlers) getJobLogs (jobID string) string {
-	streamKey := "gpu-runner:logs:" + jobID
-	ctx := context.Background()
-	entries, err := h.Client.Raw().XRange(ctx, streamKey, "-", "+").Result()
-	ServerLogger.Info("entries", entries)
-  if err != nil {
-      ServerLogger.Error("Failed to fetch logs", "Error", err, "job_id", jobID)
-			return ""
-  }
-	var logs []map[string]interface{}
-  for _, entry := range entries {
-        if msg, ok := entry.Values["message"].(string); ok {
-            var logEntry map[string]interface{}
-            if err := json.Unmarshal([]byte(msg), &logEntry); err == nil {
-                logs = append(logs, logEntry)
-						} else {
-                ServerLogger.Warn("Failed to unmarshal log entry", "error", err, "job_id", jobID, "message", msg)
-            }
+// getJobLogs returns the job's log entries from its Redis stream, as a JSON
+// array string. It returns "" if the logs can't be read.
+func (h *Handlers) getJobLogs(jobID string) string {
+	if h.Client == nil {
+		return ""
+	}
+	entries, err := h.Client.Raw().XRange(context.Background(), redis.LogStreamPrefix+jobID, "-", "+").Result()
+	if err != nil {
+		ServerLogger.Error("Failed to fetch logs", "error", err, "job_id", jobID)
+		return ""
+	}
 
-            }
-        }
-
-	if len(logs) == 0{
+	logs := make([]map[string]any, 0, len(entries))
+	for _, entry := range entries {
+		msg, ok := entry.Values["message"].(string)
+		if !ok {
+			continue
+		}
+		var logEntry map[string]any
+		if err := json.Unmarshal([]byte(msg), &logEntry); err != nil {
+			ServerLogger.Warn("Failed to unmarshal log entry", "error", err, "job_id", jobID, "message", msg)
+			continue
+		}
+		logs = append(logs, logEntry)
+	}
+	if len(logs) == 0 {
 		ServerLogger.Info("No logs found for job", "job_id", jobID)
 	}
-	logByte, err := json.Marshal(logs)
 
-	return string(logByte)
+	logBytes, err := json.Marshal(logs)
+	if err != nil {
+		ServerLogger.Error("Failed to encode logs", "error", err, "job_id", jobID)
+		return ""
+	}
+	return string(logBytes)
 }

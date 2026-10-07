@@ -49,6 +49,9 @@ func InitLogger(cfg *config.LoggerConfig) error {
 		&slog.HandlerOptions{Level: level},
 	)
 
-	Server = slog.New(handler)
+	// Update the existing logger in place rather than replacing the pointer:
+	// packages copy logger.Server into their own variables at init, before
+	// this runs, and they must see the configured handler too.
+	*Server = *slog.New(handler)
 	return nil
 }

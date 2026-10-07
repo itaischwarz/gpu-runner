@@ -5,7 +5,9 @@ import (
     "fmt"
     "io"
     "net/http"
+    "sort"
     "strings"
+    "time"
 
     "github.com/spf13/cobra"
 )
@@ -37,8 +39,43 @@ func checkJobStatus(jobID string) error {
         return fmt.Errorf("parse response: %w", err)
     }
 
-    fmt.Printf("Job: %s\nCommand: %s\nStatus: %s\nLogs:\n%s\n", job.ID, job.Command, job.Status, job.Log)
+    fmt.Printf("Job: %s\nCommand: %s\nStatus: %s\nLogs:\n%s\n", job.ID, job.Command, job.Status, formatLogs(job.Log))
     return nil
+}
+
+// formatLogs turns the API's JSON log entries into one readable line each:
+// "15:04:05 INFO  message key=value ...". It falls back to the raw text if the
+// logs aren't in the expected format.
+func formatLogs(raw string) string {
+    var entries []struct {
+        Level     string         `json:"level"`
+        Message   string         `json:"message"`
+        Timestamp time.Time      `json:"timestamp"`
+        Fields    map[string]any `json:"fields"`
+    }
+    if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+        return raw
+    }
+    if len(entries) == 0 {
+        return "  (no logs yet)"
+    }
+
+    var b strings.Builder
+    for _, e := range entries {
+        fmt.Fprintf(&b, "  %s %-5s %s", e.Timestamp.Local().Format("15:04:05"), strings.ToUpper(e.Level), e.Message)
+        keys := make([]string, 0, len(e.Fields))
+        for k := range e.Fields {
+            if k != "job_id" { // already shown above
+                keys = append(keys, k)
+            }
+        }
+        sort.Strings(keys)
+        for _, k := range keys {
+            fmt.Fprintf(&b, " %s=%v", k, e.Fields[k])
+        }
+        b.WriteString("\n")
+    }
+    return strings.TrimRight(b.String(), "\n")
 }
 
 var statusCmd = &cobra.Command{

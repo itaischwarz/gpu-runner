@@ -59,6 +59,18 @@ func (cp *ControlPlane) PollFreeMemory(ctx context.Context) map[string]int {
 	return free
 }
 
+// MaxMemoryMB returns the total memory of the largest GPU found at discovery:
+// the biggest job this machine could ever run.
+func (cp *ControlPlane) MaxMemoryMB() int {
+	largest := 0
+	for _, s := range cp.slotTable.Snapshot() {
+		if s.TotalMemoryMB > largest {
+			largest = s.TotalMemoryMB
+		}
+	}
+	return largest
+}
+
 // Health runs nvidia-smi now and returns an error unless it can reach at
 // least one healthy GPU.
 func (cp *ControlPlane) Health(ctx context.Context) error {
