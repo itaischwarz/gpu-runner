@@ -48,8 +48,7 @@ func submitJob(command string, storage string, maxRetriesStr string, memoryStr s
     if err != nil {
         return fmt.Errorf("submit request failed: %w", err)
     }
-    defer resp.Body.Close()
-
+    defer func() { _ = resp.Body.Close() }()
     payload, _ := io.ReadAll(resp.Body)
     if resp.StatusCode >= 300 {
         return fmt.Errorf("submit failed (%s): %s", resp.Status, strings.TrimSpace(string(payload)))
@@ -81,11 +80,10 @@ var submitCmd = &cobra.Command{
 
 func init() {
     submitCmd.Flags().String("cmd", "", "Command to run")
-    submitCmd.MarkFlagRequired("cmd")
+    cobra.CheckErr(submitCmd.MarkFlagRequired("cmd"))
     submitCmd.Flags().String("storage", "", "Storage for Job")
     submitCmd.Flags().String("maxRetries", "", "Attempts running a job")
     submitCmd.Flags().String("memory", "", "GPU memory the job needs, in MB (required)")
-    submitCmd.MarkFlagRequired("memory")
-
+    cobra.CheckErr(submitCmd.MarkFlagRequired("memory"))
     rootCmd.AddCommand(submitCmd)
 }

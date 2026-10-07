@@ -82,12 +82,18 @@ func (s *JobStore) addMissingColumns() error {
 			defaultValue     sql.NullString
 		)
 		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return err
 		}
 		existing[name] = true
 	}
-	rows.Close()
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
 
 	for _, c := range columns {
 		if existing[c.name] {
@@ -198,8 +204,7 @@ func (s *JobStore) ListJobs(status string) ([]*jobs.Job, error) {
 		serverLogger.Error("Database query failed", "error", err)
 		return nil, err
 	}
-	defer rows.Close()
-
+	defer func() { _ = rows.Close() }()
 	var jobList []*jobs.Job
 	for rows.Next() {
 		var j jobs.Job

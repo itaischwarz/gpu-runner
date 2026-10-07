@@ -24,8 +24,7 @@ func cancelJob(jobID string, reason string) error {
     if err != nil {
         return fmt.Errorf("cancel request failed: %w", err)
     }
-    defer resp.Body.Close()
-
+    defer func() { _ = resp.Body.Close() }()
     payload, _ := io.ReadAll(resp.Body)
     if resp.StatusCode >= 300 {
         return fmt.Errorf("cancel failed (%s): %s", resp.Status, strings.TrimSpace(string(payload)))
@@ -55,7 +54,7 @@ var cancelCmd = &cobra.Command{
 
 func init() {
     cancelCmd.Flags().String("id", "", "Job to Cancel")
-    cancelCmd.MarkFlagRequired("id")
+    cobra.CheckErr(cancelCmd.MarkFlagRequired("id"))
     cancelCmd.Flags().String("reason", "", "Reason for Cancellation")
     rootCmd.AddCommand(cancelCmd)
 }

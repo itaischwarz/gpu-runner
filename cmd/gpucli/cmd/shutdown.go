@@ -25,8 +25,7 @@ func shutdownServer(reason string) error {
     if err != nil {
         return fmt.Errorf("unable to shutdown server: %w", err)
     }
-    defer resp.Body.Close()
-
+    defer func() { _ = resp.Body.Close() }()
     body, err := io.ReadAll(resp.Body)
     if err != nil {
         return fmt.Errorf("read response: %w", err)
@@ -47,6 +46,6 @@ var shutdownCmd = &cobra.Command{
 
 func init() {
     shutdownCmd.Flags().String("reason", "", "Reason for Shutdown")
-    shutdownCmd.MarkFlagRequired("reason")
+    cobra.CheckErr(shutdownCmd.MarkFlagRequired("reason"))
     rootCmd.AddCommand(shutdownCmd)
 }

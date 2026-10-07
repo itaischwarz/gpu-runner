@@ -21,8 +21,7 @@ func checkJobStatus(jobID string) error {
         fmt.Print("Failed sending to this url", base+"/jobs/"+jobID)
         return fmt.Errorf("status request failed: %w", err)
     }
-    defer resp.Body.Close()
-
+    defer func() { _ = resp.Body.Close() }()
     payload, _ := io.ReadAll(resp.Body)
     if resp.StatusCode >= 300 {
         return fmt.Errorf("status failed (%s): %s", resp.Status, strings.TrimSpace(string(payload)))

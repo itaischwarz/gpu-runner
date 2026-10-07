@@ -24,14 +24,16 @@ func setupTestHandlers(t *testing.T) *Handlers {
 	if err != nil {
 		t.Fatalf("failed to create temp db: %v", err)
 	}
-	tmpFile.Close()
-	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tmpFile.Name()) })
 
 	jobStore, err := store.NewJobStore(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
-	t.Cleanup(func() { jobStore.DB.Close() })
+	t.Cleanup(func() { _ = jobStore.DB.Close() })
 
 	exec := executer.NewExecutor(30 * time.Second)
 	queue := jobs.NewJobQueue(10)

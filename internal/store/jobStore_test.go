@@ -14,14 +14,16 @@ func setupTestStore(t *testing.T) *JobStore {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	tmpFile.Close()
-	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tmpFile.Name()) })
 
 	store, err := NewJobStore(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("failed to create job store: %v", err)
 	}
-	t.Cleanup(func() { store.DB.Close() })
+	t.Cleanup(func() { _ = store.DB.Close() })
 	return store
 }
 
@@ -320,8 +322,10 @@ func TestNewJobStoreAddsMemoryColumnToExistingDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	tmpFile.Close()
-	t.Cleanup(func() { os.Remove(tmpFile.Name()) })
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tmpFile.Name()) })
 
 	// Create a database with the schema from before the memory column existed.
 	old, err := NewJobStore(tmpFile.Name())
@@ -348,13 +352,14 @@ func TestNewJobStoreAddsMemoryColumnToExistingDatabase(t *testing.T) {
 			t.Fatalf("failed to set up old schema: %v", err)
 		}
 	}
-	old.DB.Close()
-
+	if err := old.DB.Close(); err != nil {
+		t.Fatalf("failed to close old store: %v", err)
+	}
 	s, err := NewJobStore(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("failed to reopen job store: %v", err)
 	}
-	t.Cleanup(func() { s.DB.Close() })
+	t.Cleanup(func() { _ = s.DB.Close() })
 
 	got, err := s.GetJob("1")
 	if err != nil {

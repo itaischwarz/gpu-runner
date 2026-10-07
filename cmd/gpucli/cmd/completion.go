@@ -20,19 +20,20 @@ Zsh:
 Fish:
   gpucli completion fish | source
 `,
-	Args:      cobra.ExactValidArgs(1),
+	Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		switch args[0] {
 		case "bash":
-			rootCmd.GenBashCompletion(cmd.OutOrStdout())
+			return rootCmd.GenBashCompletion(cmd.OutOrStdout())
 		case "zsh":
-			rootCmd.GenZshCompletion(cmd.OutOrStdout())
+			return rootCmd.GenZshCompletion(cmd.OutOrStdout())
 		case "fish":
-			rootCmd.GenFishCompletion(cmd.OutOrStdout(), true)
+			return rootCmd.GenFishCompletion(cmd.OutOrStdout(), true)
 		case "powershell":
-			rootCmd.GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
+			return rootCmd.GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
 		}
+		return nil
 	},
 }
 

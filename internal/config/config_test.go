@@ -11,8 +11,7 @@ func TestLoad_Defaults(t *testing.T) {
 	clearEnvVars()
 
 	// Set HOME for logger path
-	os.Setenv("HOME", "/tmp")
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", "/tmp")
 
 	cfg, err := Load()
 	if err != nil {
@@ -47,12 +46,12 @@ func TestLoad_Defaults(t *testing.T) {
 func TestLoad_CustomValues(t *testing.T) {
 	clearEnvVars()
 
-	os.Setenv("HOME", "/tmp")
-	os.Setenv("SERVER_PORT", "9000")
-	os.Setenv("REDIS_ADDRESS", "localhost:6380")
-	os.Setenv("WORKER_COUNT", "5")
-	os.Setenv("WORKER_JOB_TIMEOUT", "1m")
-	os.Setenv("DATABASE_PATH", "/custom/path/jobs.db")
+	t.Setenv("HOME", "/tmp")
+	t.Setenv("SERVER_PORT", "9000")
+	t.Setenv("REDIS_ADDRESS", "localhost:6380")
+	t.Setenv("WORKER_COUNT", "5")
+	t.Setenv("WORKER_JOB_TIMEOUT", "1m")
+	t.Setenv("DATABASE_PATH", "/custom/path/jobs.db")
 
 	defer clearEnvVars()
 
@@ -143,9 +142,9 @@ func TestLoad_GPUDefaultsAndOverrides(t *testing.T) {
 		t.Errorf("expected memory checks every 2s with 2 grace checks, got %s / %d", cfg.GPU.MemoryCheckInterval, cfg.GPU.MemoryGraceChecks)
 	}
 
-	os.Setenv("GPU_ENABLED", "true")
-	os.Setenv("NVIDIA_SMI_PATH", "/usr/bin/nvidia-smi")
-	os.Setenv("GPU_POLL_INTERVAL", "5s")
+	t.Setenv("GPU_ENABLED", "true")
+	t.Setenv("NVIDIA_SMI_PATH", "/usr/bin/nvidia-smi")
+	t.Setenv("GPU_POLL_INTERVAL", "5s")
 
 	cfg, err = Load()
 	if err != nil {
@@ -160,8 +159,8 @@ func TestValidate_InvalidGPUPollInterval(t *testing.T) {
 	clearEnvVars()
 	defer clearEnvVars()
 
-	os.Setenv("GPU_ENABLED", "true")
-	os.Setenv("GPU_POLL_INTERVAL", "100ms")
+	t.Setenv("GPU_ENABLED", "true")
+	t.Setenv("GPU_POLL_INTERVAL", "100ms")
 
 	if _, err := Load(); err == nil {
 		t.Error("expected validation error for GPU poll interval < 1s, got nil")
@@ -195,6 +194,6 @@ func clearEnvVars() {
 		"GPU_MEMORY_CHECK_INTERVAL", "GPU_MEMORY_GRACE_CHECKS",
 	}
 	for _, v := range vars {
-		os.Unsetenv(v)
+		_ = os.Unsetenv(v)
 	}
 }

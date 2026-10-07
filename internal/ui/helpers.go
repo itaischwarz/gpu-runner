@@ -22,8 +22,7 @@ func FetchActiveJobs(serverURL string) ([]string, error) {
     if err != nil {
         return nil, fmt.Errorf("fetch active jobs failed: %w", err)
     }
-    defer resp.Body.Close()
-
+    defer func() { _ = resp.Body.Close() }()
     if resp.StatusCode >= 300 {
         body, _ := io.ReadAll(resp.Body)
         return nil, fmt.Errorf("fetch failed (%s): %s", resp.Status, strings.TrimSpace(string(body)))

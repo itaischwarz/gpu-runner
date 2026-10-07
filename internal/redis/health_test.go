@@ -19,7 +19,7 @@ func newTestClient(addr string) *Client {
 
 func TestHealthFailsWhenRedisUnreachable(t *testing.T) {
 	c := newTestClient("127.0.0.1:1")
-	t.Cleanup(func() { c.rdb.Close() })
+	t.Cleanup(func() { _ = c.rdb.Close() })
 
 	if err := c.Health(context.Background()); err == nil {
 		t.Error("expected Client.Health to fail for an unreachable Redis")
@@ -37,7 +37,7 @@ func TestHealthPassesAgainstRealRedis(t *testing.T) {
 		addr = "localhost:6379"
 	}
 	c := newTestClient(addr)
-	t.Cleanup(func() { c.rdb.Close() })
+	t.Cleanup(func() { _ = c.rdb.Close() })
 
 	if err := c.rdb.Ping(context.Background()).Err(); err != nil {
 		t.Skipf("no Redis at %s: %v", addr, err)

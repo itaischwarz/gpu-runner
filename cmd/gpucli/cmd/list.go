@@ -26,8 +26,7 @@ func listJobs(statusFilter string) error {
     if err != nil {
         return fmt.Errorf("list request failed: %w", err)
     }
-    defer resp.Body.Close()
-
+    defer func() { _ = resp.Body.Close() }()
     payload, _ := io.ReadAll(resp.Body)
     if resp.StatusCode >= 300 {
         return fmt.Errorf("list failed (%s): %s", resp.Status, strings.TrimSpace(string(payload)))
@@ -51,16 +50,16 @@ func listJobs(statusFilter string) error {
     }
 
     w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-    fmt.Fprintln(w, "ID\tSTATUS\tCOMMAND\tCREATED\tFINISHED")
+    // tabwriter buffers; any write error is reported by Flush below.
+    _, _ = fmt.Fprintln(w, "ID\tSTATUS\tCOMMAND\tCREATED\tFINISHED")
     for _, j := range jobs {
         command := j.Command
         if len(command) > 40 {
             command = command[:37] + "..."
         }
-        fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", j.ID, j.Status, command, j.CreatedAt, j.FinishedAt)
+        _, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", j.ID, j.Status, command, j.CreatedAt, j.FinishedAt)
     }
-    w.Flush()
-    return nil
+    return w.Flush()
 }
 
 var listCmd = &cobra.Command{

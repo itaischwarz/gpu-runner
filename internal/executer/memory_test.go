@@ -63,7 +63,7 @@ func TestJobOverMemoryLimitIsKilledWithChildren(t *testing.T) {
 	}
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
 	if syscall.Kill(pid, 0) == nil {
-		syscall.Kill(pid, syscall.SIGKILL)
+		_ = syscall.Kill(pid, syscall.SIGKILL)
 		t.Error("child process survived the kill")
 	}
 }
@@ -116,7 +116,7 @@ func TestNvidiaSMIMemoryProbeMatchesByProcessGroup(t *testing.T) {
 	if err := job.Start(); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	t.Cleanup(func() { job.Process.Kill(); job.Wait() })
+	t.Cleanup(func() { _ = job.Process.Kill(); _ = job.Wait() })
 	pid := job.Process.Pid
 
 	// Fake nvidia-smi reports our process plus one from another group (ours).

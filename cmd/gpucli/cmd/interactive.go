@@ -110,6 +110,9 @@ func handleStopAction() error {
 
 func handleCancelAction() error {
     activeJobIDs, err := ui.FetchActiveJobs("http://0.0.0.0:8080")
+	if err != nil {
+		return err
+	}
 	jobID, err := ui.PromptForJobId(activeJobIDs)
 	if err != nil {
 		return err
