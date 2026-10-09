@@ -5,7 +5,7 @@
 #   git clone -b itai/gpu-test https://github.com/itaischwarz/gpu-runner
 #   cd gpu-runner && bash scripts/gputest/run.sh
 #
-# It installs Go, Redis and PyTorch if missing, starts the server against the
+# It installs Go and Redis if missing, starts the server against the
 # real GPU, and checks: GPU discovery, oversized-job rejection, GPU pinning,
 # per-process memory visibility, a job under its memory request, a job over
 # its memory request (should be killed), and a short load test.
@@ -30,7 +30,7 @@ step() { echo; echo "==> $*"; }
 mkdir -p "$WORK/logs" "$WORK/v10" "$WORK/v25" "$WORK/v50"
 
 # ---------------------------------------------------------------- install --
-step "Installing dependencies (first run takes a few minutes for PyTorch)"
+step "Installing dependencies"
 if ! command -v redis-server >/dev/null || ! command -v jq >/dev/null || ! command -v gcc >/dev/null; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq && apt-get install -y -qq redis-server jq gcc curl >/dev/null || { echo "apt install failed"; exit 1; }
@@ -38,17 +38,10 @@ fi
 if ! command -v go >/dev/null; then
   curl -sSL https://go.dev/dl/go1.25.5.linux-amd64.tar.gz | tar xz -C /usr/local || { echo "Go install failed"; exit 1; }
 fi
-if [ -x /venv/main/bin/python ]; then
-  PY=/venv/main/bin/python
-else
-  [ -x "$WORK/venv/bin/python" ] || python3 -m venv "$WORK/venv"
-  PY=$WORK/venv/bin/python
-fi
-if ! "$PY" -c 'import torch' 2>/dev/null; then
-  if command -v uv >/dev/null; then uv pip install -q --python "$PY" torch; else "$PY" -m pip install -q torch; fi
-fi
-"$PY" -c 'import torch; assert torch.cuda.is_available(); print("  torch", torch.__version__, "on", torch.cuda.get_device_name(0))' \
-  || { echo "PyTorch cannot see the GPU"; exit 1; }
+# GPU jobs use gpu.py, which calls the NVIDIA driver directly: no PyTorch needed.
+GPU="python3 $ROOT/scripts/gputest/gpu.py"
+INFO=$($GPU info) || { echo "cannot reach the GPU through the NVIDIA driver (libcuda)"; exit 1; }
+echo "  GPU via driver: $INFO"
 go version | sed 's/^/  /'
 
 redis-cli ping >/dev/null 2>&1 || redis-server --daemonize yes --save '' --appendonly no >/dev/null
@@ -72,14 +65,6 @@ echo $! >"$WORK/server.pid"
 for _ in $(seq 50); do curl -sf "$URL/metrics" >/dev/null && break; sleep 0.2; done
 curl -sf "$URL/metrics" >/dev/null || { echo "server did not start:"; tail -20 "$WORK/server.out"; exit 1; }
 echo "  pid $(cat "$WORK/server.pid"), logs in $WORK/logs/server.log"
-
-# A small PyTorch program that holds N GB of GPU memory for S seconds.
-cat >"$WORK/alloc.py" <<'EOF'
-import sys, time, torch
-x = torch.empty(int(float(sys.argv[1]) * 1024**3), dtype=torch.uint8, device="cuda")
-torch.cuda.synchronize()
-time.sleep(float(sys.argv[2]))
-EOF
 
 # submit COMMAND MEMORY_MB -> prints the job ID
 submit() {
@@ -113,7 +98,7 @@ CODE=$(curl -s -o "$WORK/reject.json" -w '%{http_code}' -X POST "$URL/jobs" -H '
 
 step "3. GPU pinning (job sees only its own GPU)"
 rm -f "$WORK/pin.txt"
-ID=$(submit "$PY -c \"import os,torch; print(os.environ.get('CUDA_VISIBLE_DEVICES'), torch.cuda.device_count(), torch.cuda.get_device_name(0))\" > $WORK/pin.txt" 2000)
+ID=$(submit "$GPU info > $WORK/pin.txt" 2000)
 ST=$(wait_job "$ID" 120)
 echo "        job saw: $(cat "$WORK/pin.txt" 2>/dev/null)"
 read -r PIN_ENV PIN_COUNT _ <"$WORK/pin.txt" 2>/dev/null || true
@@ -124,14 +109,14 @@ else
 fi
 
 step "4. Can nvidia-smi see per-process GPU memory here? (memory kill depends on it)"
-ID=$(submit "$PY $WORK/alloc.py 3 15" 8000)
+ID=$(submit "$GPU alloc 3 15" 8000)
 sleep 8
 APPS=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits)
 echo "        nvidia-smi compute-apps: ${APPS:-<empty>}"
 VISIBLE=0
 while IFS=, read -r pid _; do
   pid=${pid// /}
-  [ -n "$pid" ] && ps -p "$pid" -o args= 2>/dev/null | grep -q alloc.py && VISIBLE=1
+  [ -n "$pid" ] && ps -p "$pid" -o args= 2>/dev/null | grep -q gpu.py && VISIBLE=1
 done <<<"$APPS"
 if [ "$VISIBLE" = 1 ]; then
   pass "job's process and its GPU memory are visible"
@@ -145,7 +130,7 @@ ST=$(wait_job "$ID" 60)
 
 step "6. Job over its memory request is killed (6 GB used, 2000 MB requested)"
 START=$(date +%s)
-ID=$(submit "$PY $WORK/alloc.py 6 40" 2000)
+ID=$(submit "$GPU alloc 6 40" 2000)
 ST=$(wait_job "$ID" 90)
 ERR=$(job_error "$ID")
 echo "        status=$ST after $(($(date +%s) - START))s, error: ${ERR:-<none>}"

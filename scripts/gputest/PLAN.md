@@ -42,7 +42,7 @@ git clone -b itai/gpu-test https://github.com/itaischwarz/gpu-runner
 cd gpu-runner && bash scripts/gputest/run.sh
 ```
 
-This takes about 5–10 minutes the first time, mostly downloading PyTorch. Copy
+This takes about 2–3 minutes (installing Go and Redis, then the checks). Copy
 everything it prints.
 
 ## Step 3: run on box B
@@ -74,7 +74,7 @@ They charge while they're running.
 |---|---|---|
 | 1 | GPU discovery | The server found the real GPU through `nvidia-smi` |
 | 2 | Oversized job | A job bigger than the GPU gets HTTP 400 |
-| 3 | Pinning | A PyTorch job sees only its assigned GPU (`CUDA_VISIBLE_DEVICES`) |
+| 3 | Pinning | A GPU job sees only its assigned GPU (`CUDA_VISIBLE_DEVICES`) |
 | 4 | Process visibility | `nvidia-smi` can see how much memory each job uses |
 | 5 | Under request | A job using 3 GB with 8000 MB requested succeeds |
 | 6 | Over request | A job using 6 GB with 2000 MB requested gets killed with "GPU memory exceeded" |
@@ -97,8 +97,14 @@ To stop the server on the box: `kill $(cat /root/gputest/server.pid)`.
 
 ## If something breaks
 
-- **"PyTorch cannot see the GPU"**: paste the output to Claude; it's usually a
-  CUDA version mismatch (box B's 5090 needs a recent PyTorch).
+- **Errors about torch / PyTorch downloads**: you're running an old copy of
+  the script. It no longer needs PyTorch (`gpu.py` talks to the NVIDIA driver
+  directly). Run `git pull`, then re-run.
+- **"Could not request local forwarding"** when you SSH in: another session
+  already forwards port 8080. Harmless for the test; to reach the server from
+  your Mac too, use `-L 8081:localhost:8080` and open `localhost:8081`.
+- **"cannot reach the GPU through the NVIDIA driver"**: run `nvidia-smi` on
+  the box; if that fails too, the box itself is broken, so rent another.
 - **"server did not start"**: the script prints the last log lines; paste them.
 - **Re-running**: just run `bash scripts/gputest/run.sh` again. It restarts the
   server and skips anything already installed.
