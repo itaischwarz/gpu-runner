@@ -11,12 +11,12 @@
 # its memory request (should be killed), and a short load test.
 #
 # The server is left running on 127.0.0.1:$PORT afterwards so you can poke it
-# (e.g. through `ssh -L 8080:localhost:8080`). Re-running the script restarts it.
+# (e.g. through `ssh -L 18080:localhost:18080`). Re-running the script restarts it.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 WORK=${WORK:-/root/gputest}
-PORT=${PORT:-8080}
+PORT=${PORT:-18080} # 8080 is often taken on cloud boxes (e.g. Jupyter)
 REDIS_DB=${REDIS_DB:-15}
 URL=http://127.0.0.1:$PORT
 export PATH=/usr/local/go/bin:$PATH
@@ -54,6 +54,10 @@ echo "  ok"
 # ----------------------------------------------------------------- server --
 step "Starting server on $URL"
 if [ -f "$WORK/server.pid" ]; then kill "$(cat "$WORK/server.pid")" 2>/dev/null; sleep 1; fi
+if (echo >"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
+  echo "Port $PORT is already in use on this box. Re-run with another, e.g.: PORT=18090 bash $0"
+  exit 1
+fi
 redis FLUSHDB >/dev/null # test DB only; jobs from a previous run would be replayed
 rm -f "$WORK/jobs.db"
 GPU_ENABLED=true GPU_POLL_INTERVAL=2s WORKER_JOB_TIMEOUT=120s WORKER_QUEUE_CAPACITY=50 \
