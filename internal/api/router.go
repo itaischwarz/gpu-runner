@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 
@@ -23,6 +24,7 @@ func NewRouter(h *Handlers) *mux.Router {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/health", h.HealthCheck).Methods("GET")
+	r.Handle("/metrics", promhttp.Handler()).Methods("GET")
 	r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
 	r.HandleFunc("/jobs", h.ListJobs).Methods("GET")
 	r.HandleFunc("/endjobs/{id}", h.CancelJob).Methods("POST")

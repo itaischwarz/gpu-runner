@@ -35,4 +35,8 @@ type Job struct {
 	// NoRetry marks a failure that retrying can't fix, e.g. exceeding the
 	// memory request. It is only passed from the worker to the acknowledger.
 	NoRetry bool `json:"-"`
+	// RedisPayload is the job exactly as it was stored in Redis when it was
+	// dequeued. Acknowledging removes this exact entry from the processing
+	// list, so later changes to the job (e.g. its status) don't matter.
+	RedisPayload string `json:"-"`
 }
