@@ -66,6 +66,8 @@ func (w *Worker) Start(ctx context.Context) {
 
 				workerLogger.Info("Executing job command", "worker_id", w.ID, "job_id", job.ID)
 				output, err := w.JobQueue.Executor.RunJobWithEnv(job.Command, job.ID, volumePath, jobCtx, *job.Logger, w.Env, job.MemoryMB)
+				// Read before cancel(): afterwards jobCtx always reports Canceled.
+				userCancelled := errors.Is(jobCtx.Err(), context.Canceled)
 				cancel()
 
 				if err != nil {
@@ -73,6 +75,11 @@ func (w *Worker) Start(ctx context.Context) {
 					job.Error = err.Error()
 					var memErr *executer.MemoryExceededError
 					if errors.As(err, &memErr) {
+						job.NoRetry = true
+					}
+					if userCancelled {
+						// Cancelled by the user: keep it cancelled, don't retry.
+						job.Status = StatusCancelled
 						job.NoRetry = true
 					}
 					workerLogger.Error("Job execution failed", "worker_id", w.ID, "job_id", job.ID, "error", err)

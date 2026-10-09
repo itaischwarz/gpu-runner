@@ -62,27 +62,32 @@ func (c *Client) Dequeue(ctx context.Context, timeout time.Duration) (*jobs.Job,
 		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
 	}
 
+	job.RedisPayload = result
 	redisLogger.Info("Job dequeued from Redis", "job_id", job.ID, "status", job.Status)
 	return &job, nil
 }
 
 // Acknowledge removes a completed job from the processing list
+// Acknowledge removes a finished job from the processing list. It removes the
+// exact entry the job was dequeued from (job.RedisPayload), so it works even
+// though the job's fields changed while it ran.
 func (c *Client) Acknowledge(ctx context.Context, job jobs.Job) error {
-	data, err := json.Marshal(job)
-	if err != nil {
-		if job.Logger != nil {
-			job.Logger.Error("Failed to marshal job for acknowledgment", logger.Item("error", err))
-		}
-		redisLogger.Error("Failed to marshal job for acknowledgment", "error", err, "job_id", job.ID)
-		return fmt.Errorf("failed to marshal job: %w", err)
+	if job.RedisPayload == "" {
+		redisLogger.Error("Cannot acknowledge job without its Redis payload", "job_id", job.ID)
+		return fmt.Errorf("job %s has no Redis payload to acknowledge", job.ID)
 	}
 
-	if err := c.rdb.LRem(ctx, JobProcessingKey, 1, data).Err(); err != nil {
+	removed, err := c.rdb.LRem(ctx, JobProcessingKey, 1, job.RedisPayload).Result()
+	if err != nil {
 		if job.Logger != nil {
 			job.Logger.Error("Failed to acknowledge job in Redis", logger.Item("error", err))
 		}
 		redisLogger.Error("Redis LRem failed during acknowledgment", "error", err, "job_id", job.ID, "queue", JobProcessingKey)
 		return fmt.Errorf("failed to acknowledge job: %w", err)
+	}
+	if removed == 0 {
+		redisLogger.Warn("Job was not in the processing list", "job_id", job.ID, "queue", JobProcessingKey)
+		return fmt.Errorf("job %s was not in the processing list", job.ID)
 	}
 
 	if job.Logger != nil {

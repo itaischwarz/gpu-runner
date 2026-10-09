@@ -16,9 +16,9 @@ type Offerer interface {
 
 
 type Dispatcher struct {
-	available map[string]int // slot ID → free memory (MB)
+	available map[string]int // idle slot ID → free memory (MB); health is checked on read
 	released  chan finished    // slot IDs whose job just finished
-	polled    chan *jobs.Job  // signal that a poll just completed
+	polled    chan struct{}   // signal that a poll just completed
 	inboxes   map[string] chan *jobs.Job
 	mu        sync.Mutex
 	controlplane ControlPlane
@@ -34,6 +34,16 @@ type finished struct {
 
 func (d *Dispatcher) Release(slotID string, job *jobs.Job) {
     d.released <- finished{slotID, job}
+}
+
+
+// Polled tells the dispatcher a GPU poll just finished. It never blocks, and
+// several calls before the dispatcher runs collapse into one.
+func (d *Dispatcher) Polled() {
+	select {
+	case d.polled <- struct{}{}:
+	default:
+	}
 }
 
 
@@ -54,11 +64,15 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 
 
 func NewDispatcher(ctx context.Context, cp ControlPlane) *Dispatcher {
-	available := cp.PollFreeMemory(ctx)
+	free := cp.PollFreeMemory(ctx)
 	release := make(chan finished)
-	polled := make(chan *jobs.Job)
+	polled := make(chan struct{}, 1)
+	// Every slot starts idle, including ones that are unhealthy right now, so
+	// a GPU that recovers is offered again.
+	available := make(map[string]int)
 	inboxes := make(map[string] chan *jobs.Job)
 	for _, s := range cp.slotTable.Snapshot() {
+		available[s.ID] = free[s.ID]
 		inboxes[s.ID] = make(chan *jobs.Job, 1)
 	}
 	return &Dispatcher{available: available, released: release, polled: polled, inboxes: inboxes, controlplane: cp}
@@ -71,24 +85,18 @@ func(d *Dispatcher) Dispatch(ctx context.Context) {
 		for{
 			select{
 			case jobFinished := <- d.released:
-				// The slot is free again: re-read its free memory and make it
-				// available, unless it went unhealthy while the job ran.
+				// The slot is idle again: re-read its free memory. If it went
+				// unhealthy, it stays idle but isn't offered until it recovers.
 				free := d.controlplane.PollFreeMemory(ctx)
 				d.mu.Lock()
-				if mem, healthy := free[jobFinished.slotID]; healthy {
-					d.available[jobFinished.slotID] = mem
-				}
+				d.available[jobFinished.slotID] = free[jobFinished.slotID]
 				d.mu.Unlock()
 			case <- d.polled:
-				// Refresh free memory for idle slots and drop any that went unhealthy.
-				free := d.controlplane.PollFreeMemory(ctx)
+				// A poll just ran: refresh free memory for idle slots from it.
+				free := d.controlplane.FreeMemory()
 				d.mu.Lock()
 				for slotID := range d.available {
-					if mem, healthy := free[slotID]; healthy {
-						d.available[slotID] = mem
-					} else {
-						delete(d.available, slotID)
-					}
+					d.available[slotID] = free[slotID]
 				}
 				d.mu.Unlock()
 			case <- ctx.Done(): return
@@ -106,11 +114,12 @@ func (d *Dispatcher) Inbox() map[string] chan *jobs.Job {
 // Available returns the idle, healthy slots with at least memoryMB free, for
 // the queue to place a job of that size.
 func (d *Dispatcher) Available(memoryMB int) []queue.Offer {
+	healthy := d.controlplane.FreeMemory()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	offers := make([]queue.Offer, 0, len(d.available))
 	for id, mem := range d.available {
-		if mem >= memoryMB {
+		if _, ok := healthy[id]; ok && mem >= memoryMB {
 			offers = append(offers, queue.Offer{SlotID: id, FreeMemoryMB: mem})
 		}
 	}
@@ -120,6 +129,7 @@ func (d *Dispatcher) Available(memoryMB int) []queue.Offer {
 
 
 func (d *Dispatcher) Place(slotID string, job *jobs.Job) error {
+	healthy := d.controlplane.FreeMemory()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -127,11 +137,15 @@ func (d *Dispatcher) Place(slotID string, job *jobs.Job) error {
 	if !idle {
 		return fmt.Errorf("slot %s is not available", slotID) // the offer went stale
 	}
+	if _, ok := healthy[slotID]; !ok {
+		return fmt.Errorf("slot %s is unhealthy", slotID)
+	}
 	if job.MemoryMB > free {
 		return fmt.Errorf("slot %s has %d MB free, job needs %d", slotID, free, job.MemoryMB)
 	}
 	delete(d.available, slotID) // busy until Release
 	d.inboxes[slotID] <- job    // that slot's worker picks it up
+	jobsPlaced.WithLabelValues(slotID).Inc()
 	return nil
 }
 

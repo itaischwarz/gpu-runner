@@ -111,3 +111,32 @@ func TestWorkerMarksMemoryKillAsFailedWithoutRetry(t *testing.T) {
 		t.Errorf("expected the memory error on the job, got %q", got.Error)
 	}
 }
+
+func TestWorkerKeepsUserCancelledJobCancelled(t *testing.T) {
+	jq := NewJobQueue(1)
+	jq.Executor = executer.NewExecutor(10 * time.Second)
+	results := make(chan *Job, 1)
+	inbox := make(chan *Job, 1)
+	w := NewWorker(1, jq, results)
+	w.Inbox = inbox
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.Start(ctx)
+
+	inbox <- newTestJob("c1", "sleep 30")
+
+	// Cancel through the executor, the way the API's cancel endpoint does.
+	deadline := time.Now().Add(2 * time.Second)
+	for jq.Executor.CancelJob("c1") != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("job never became cancellable")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	got := waitForResult(t, results)
+	if got.Status != StatusCancelled || !got.NoRetry {
+		t.Fatalf("expected cancelled and not retried, got status=%s noRetry=%v", got.Status, got.NoRetry)
+	}
+}

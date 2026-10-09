@@ -11,6 +11,8 @@ import (
 	"gpu-runner/internal/queue"
 	"gpu-runner/internal/redis"
 	"gpu-runner/internal/store"
+
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"net/http"
 	"os/signal"
@@ -53,8 +55,7 @@ func main() {
 			serverLogger.Error("Failed to initialize control plane", "error", err)
 			log.Fatalf("Failed to initialize control plane: %v", err)
 		}
-		cp.UpdateGPUHealth(ctx)
-		serverLogger.Info("Control plane started, polling GPU health")
+		serverLogger.Info("Control plane initialized", "largest_gpu_mb", cp.MaxMemoryMB())
 	} else {
 		serverLogger.Info("GPU disabled, skipping control plane")
 	}
@@ -130,6 +131,18 @@ func main() {
 		}
 		dispatcher.Dispatch(ctx)
 		jobQ.Start(ctx)
+
+		// After each health poll, refresh the dispatcher's view of idle GPUs and
+		// let the queue retry, e.g. because a GPU recovered.
+		cp.OnPoll(func() {
+			dispatcher.Polled()
+			jobQ.Wake()
+		})
+		cp.UpdateGPUHealth(ctx)
+		serverLogger.Info("Control plane started, polling GPU health", "interval", cfg.GPU.PollInterval)
+
+		// Per-GPU memory, health and busy state on /metrics.
+		prometheus.MustRegister(controlplane.NewGPUCollector(cp, dispatcher))
 		intake = jobQ.Intake()
 		serverLogger.Info("GPU scheduling started", "gpus", len(slotIDs))
 	} else {
@@ -140,6 +153,16 @@ func main() {
 		}
 		intake = jobQueue.Queue
 		serverLogger.Info("All workers started successfully")
+	}
+
+	// Crash recovery: jobs still in the processing list were running when the
+	// server last stopped. Put them back in the pending list so they run
+	// again. This assumes one server per Redis; with several, it would also
+	// requeue jobs another server is running.
+	if n, err := client.RequeueStaleJobs(ctx); err != nil {
+		serverLogger.Error("Failed to requeue stale jobs", "error", err)
+	} else if n > 0 {
+		serverLogger.Warn("Requeued jobs left running by a previous crash", "count", n)
 	}
 
 	serverLogger.Info("Starting Redis adapter")

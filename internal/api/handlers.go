@@ -273,28 +273,32 @@ func (h *Handlers) StartRedisAcknowledger(ctx context.Context, results chan *job
 				if err := h.JobStore.UpdateJob(res); err != nil {
 					ServerLogger.Error("Failed to update job", "error", err, "job_id", res.ID)
 				}
-				switch res.Status {
-				case jobs.StatusSuccess:
+				// Every outcome removes the job's entry from the processing list.
+				// A retry pushes the new attempt first, so a crash in between can
+				// run the job twice but never loses it.
+				switch {
+				case res.Status == jobs.StatusSuccess:
 					ServerLogger.Info("Acknowledging successful job", "job_id", res.ID)
-					if err := h.Client.Acknowledge(ctx, *res); err != nil {
-						ServerLogger.Error("Failed to acknowledge job", "error", err, "job_id", res.ID)
-					}
-				case jobs.StatusFailed:
-					if res.NoRetry {
-						ServerLogger.Warn("Job failed and will not be retried", "job_id", res.ID, "error", res.Error)
-						continue
-					}
-					if res.JobTrial >= res.MaxRetries {
-						ServerLogger.Warn("Job exhausted all retries", "job_id", res.ID, "trials", res.JobTrial, "max_retries", res.MaxRetries)
-						continue
-					}
-					res.JobTrial++
-					ServerLogger.Info("Retrying failed job", "job_id", res.ID, "trial", res.JobTrial, "max_retries", res.MaxRetries)
-					if err := h.Client.Enqueue(ctx, *res); err != nil {
+				case res.NoRetry:
+					ServerLogger.Warn("Job will not be retried", "job_id", res.ID, "status", res.Status, "error", res.Error)
+				case res.Status == jobs.StatusFailed && res.JobTrial >= res.MaxRetries:
+					ServerLogger.Warn("Job exhausted all retries", "job_id", res.ID, "trials", res.JobTrial, "max_retries", res.MaxRetries)
+				case res.Status == jobs.StatusFailed:
+					retry := *res
+					retry.JobTrial++
+					ServerLogger.Info("Retrying failed job", "job_id", res.ID, "trial", retry.JobTrial, "max_retries", res.MaxRetries)
+					if err := h.Client.Enqueue(ctx, retry); err != nil {
+						// Leave the old entry in processing so the job isn't lost;
+						// startup recovery will requeue it.
 						ServerLogger.Error("Failed to re-enqueue job", "error", err, "job_id", res.ID)
+						continue
 					}
 				default:
-					ServerLogger.Info("Updating job with status", "job_id", res.ID, "status", res.Status)
+					ServerLogger.Warn("Unexpected job status from worker", "job_id", res.ID, "status", res.Status)
+					continue
+				}
+				if err := h.Client.Acknowledge(ctx, *res); err != nil {
+					ServerLogger.Error("Failed to acknowledge job", "error", err, "job_id", res.ID)
 				}
 			}
 		}

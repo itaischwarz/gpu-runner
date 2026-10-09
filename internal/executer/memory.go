@@ -9,7 +9,15 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+var memoryKills = promauto.NewCounter(prometheus.CounterOpts{
+	Name: "gpu_runner_gpu_memory_kills_total",
+	Help: "Jobs killed for using more GPU memory than they requested.",
+})
 
 // MemoryProbe returns how much GPU memory, in MB, the processes in process
 // group pgid are using right now.
@@ -64,6 +72,7 @@ func (e *Executor) watchMemory(ctx context.Context, pgid, limitMB int, kill func
 			strikes++
 			executorLogger.Warn("Job over GPU memory request", "job_id", jobID, "used_mb", used, "limit_mb", limitMB, "strike", strikes)
 			if strikes >= e.memGraceChecks {
+				memoryKills.Inc()
 				kill()
 				done <- &MemoryExceededError{UsedMB: used, LimitMB: limitMB}
 				return
