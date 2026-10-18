@@ -1,260 +1,196 @@
 # gpu-runner
 
-A job runner service that executes shell commands with configurable storage volumes, retry logic, and Redis-backed queuing.
+A job runner that executes shell commands on CPU workers or on NVIDIA GPUs. Jobs are queued in Redis, stored in SQLite, retried on failure, and, in GPU mode, scheduled onto GPUs by free memory, with a hard limit on how much GPU memory each job may use.
 
-## Architecture
+## How it works
 
-- **HTTP API** (gorilla/mux) for job submission, listing, status, and cancellation
-- **Redis** for job queuing (pending/processing lists) and structured log streaming
-- **SQLite** for persistent job storage
-- **Worker pool** (configurable) that dequeue and execute jobs with configurable timeouts
-- **Fully configurable** via environment variables
+```
+gpucli / HTTP ─► API ─► Redis (pending → processing) ─► Redis adapter ─┐
+                  │                                                     │
+                  └─ SQLite job store ◄── acknowledger ◄── results ◄────┤
+                                                                        │
+  CPU mode (GPU_ENABLED=false):  WORKER_COUNT workers share one in-memory queue
+  GPU mode (GPU_ENABLED=true):   queue (FIFO) ─► dispatcher ─► one worker per GPU
+                                                     ▲
+                                 control plane ── polls nvidia-smi
+```
 
-## Features
+- **API** (`internal/api`): gorilla/mux HTTP server for submitting, listing, inspecting, and cancelling jobs, plus `/health` and Prometheus `/metrics`.
+- **Redis** (`internal/redis`): the `gpu-runner:jobs:pending` and `gpu-runner:jobs:processing` lists, and one log stream per job (`gpu-runner:logs:<id>`).
+- **SQLite** (`internal/store`): persistent job records.
+- **Workers and executor** (`internal/jobs`, `internal/executer`): run each job as `bash -c` in its own process group, inside its storage volume, with a timeout.
+- **Acknowledger**: writes each result to SQLite, re-enqueues failed jobs until `max_retries`, and removes finished jobs from the processing list.
+- **Crash recovery**: at startup, jobs left in the processing list by a previous run are moved back to pending.
 
-- Job submission, queuing, execution, and cancellation
-- Automatic retry logic with configurable max retries
-- Storage volume tiers (10MB, 25MB, 50MB)
-- Real-time structured logging via Redis Streams
-- Graceful shutdown handling
-- Environment variable configuration for all settings
-- Docker Compose deployment ready
+### GPU mode
+
+When `GPU_ENABLED=true`:
+
+- **Control plane** (`internal/controlplane`) discovers GPUs with `nvidia-smi` at startup (startup fails if it can't), then polls every `GPU_POLL_INTERVAL` for health and free memory. A GPU whose row is missing or doesn't parse is marked unhealthy.
+- **Queue** (`internal/queue`) holds waiting jobs and tries them in FIFO order. A job that doesn't fit anywhere yet is skipped, so smaller jobs behind it can still run.
+- **Dispatcher** offers idle, healthy GPUs with at least `memory_mb` free. Among those, the smallest GPU is tried first, so large GPUs stay free for large jobs.
+- **One worker per GPU.** Each job sees only its GPU, through `CUDA_VISIBLE_DEVICES=<gpu uuid>`.
+- **Fail fast:** a job asking for more memory than the largest GPU is rejected with a 400 when submitted.
+- **Memory enforcement:** every `GPU_MEMORY_CHECK_INTERVAL`, a running job's GPU memory is measured per process group (`nvidia-smi --query-compute-apps`). If it stays above `memory_mb` for `GPU_MEMORY_GRACE_CHECKS` checks in a row, the whole process group is killed, and the job fails with an `exceeded memory request` error and is **not retried**.
+
+Frameworks that reserve GPU memory up front (JAX takes ~75% by default, and PyTorch's caching allocator holds on to freed memory) must be capped (for example with `XLA_PYTHON_CLIENT_MEM_FRACTION`) or given a large enough `memory_mb`. Otherwise they will be killed.
+
+See [PLAN.md](PLAN.md) for the design and the roadmap (priorities, runtime estimates, multi-node).
 
 ## Prerequisites
 
 - Go 1.25+
-- Docker & Docker Compose
-- Redis (provided via Docker Compose)
+- Docker and Docker Compose
+- Redis (included in Docker Compose)
+- For GPU mode: NVIDIA drivers and `nvidia-smi` on the host
 
-## Getting Started
+## Getting started
 
-### Quick Start with Docker Compose
+### Docker Compose
 
 ```bash
-# Copy environment file and customize as needed
-cp .env.example .env
-
-# Start the full stack (server + Redis)
-make docker-up
-
-# The server will be available at http://localhost:8080
+cp .env.example .env   # adjust as needed
+make docker-up         # server + Redis, at http://localhost:8080
 ```
 
-### Local Development
+### Local development
 
 ```bash
-# Ensure Redis is running locally
-redis-server
+redis-server &          # or: docker compose up -d redis
+make build              # builds bin/server and bin/gpucli
 
-# Build binaries
-make build
-
-# Set environment variables (optional)
-export SERVER_PORT=8080
 export REDIS_ADDRESS=localhost:6379
-export WORKER_COUNT=5
-
-# Run server
+export DATABASE_PATH=./jobs.db
+export GPU_ENABLED=true # optional, needs nvidia-smi
 ./bin/server
 ```
 
-## CLI Usage
+## CLI
+
+The CLI talks to `GPU_RUNNER_SERVER` (default `http://0.0.0.0:8080`), or to `--server`.
 
 ```bash
-# Submit a job
-./bin/gpucli submit --cmd "echo hello" --storage 10485760 --maxRetries 3
+# Submit a job (--cmd and --memory are required)
+gpucli submit --cmd "python train.py" --memory 8000 --storage 10485760 --maxRetries 3
 
-# List all jobs
-./bin/gpucli list
+# List jobs, optionally by status (pending, running, success, failed, cancelled)
+gpucli list
+gpucli list --status running
 
-# List by status
-./bin/gpucli list --status pending
-
-# Check job status
-./bin/gpucli status <job-id>
+# Show a job, including its logs
+gpucli status <job-id>
 
 # Cancel a job
-./bin/gpucli cancel --id <job-id> --reason "no longer needed"
+gpucli cancel --id <job-id> --reason "no longer needed"
+
+# Shut the server down (sends SHUTDOWN_TOKEN as a bearer token)
+gpucli shutdown --reason "maintenance"
+
+# Menu-driven mode
+gpucli interactive
 ```
 
-## API Endpoints
+## API
 
-| Method | Path             | Description        |
-|--------|------------------|--------------------|
-| POST   | `/jobs`          | Create a new job   |
-| GET    | `/jobs`          | List jobs          |
-| GET    | `/jobs/{id}`     | Get job details    |
-| POST   | `/endjobs/{id}`  | Cancel a job       |
+| Method | Path            | Description                                                 |
+|--------|-----------------|-------------------------------------------------------------|
+| POST   | `/jobs`         | Create a job                                                |
+| GET    | `/jobs`         | List jobs (`?status=` to filter)                            |
+| GET    | `/jobs/{id}`    | Get a job, with its logs                                    |
+| POST   | `/endjobs/{id}` | Cancel a job (body: `{"reason": "..."}`)                    |
+| GET    | `/health`       | Server and Redis status                                     |
+| GET    | `/metrics`      | Prometheus metrics                                          |
+| DELETE | `/server`       | Graceful shutdown (`Authorization: Bearer $SHUTDOWN_TOKEN`) |
 
-### Create Job
+### Create a job
 
 ```json
 POST /jobs
 {
-  "command": "echo hello",
+  "command": "python train.py",
+  "memory_mb": 8000,
   "storage": 10485760,
   "max_retries": 3
 }
 ```
 
-Storage is auto-adjusted to the nearest tier: 10MB, 25MB, or 50MB. Default `max_retries` is 3.
+| Field         | Required | Notes                                                                          |
+|---------------|----------|--------------------------------------------------------------------------------|
+| `command`     | yes      | Run with `bash -c`                                                             |
+| `memory_mb`   | yes      | Must be positive. In GPU mode this is both a placement requirement and an enforced limit. |
+| `storage`     | no       | Bytes, rounded up to a storage tier (10, 25, or 50 MB). More than 50 MB is rejected. |
+| `max_retries` | no       | Default `3`                                                                    |
 
-## Storage Volumes
+A failed job's reason is returned in its `error` field.
 
-| Tier  | Bytes      | Path                              |
-|-------|------------|-----------------------------------|
-| 10MB  | 10485760   | `/var/lib/jobrunner/volumes/10mb` |
-| 25MB  | 26214400   | `/var/lib/jobrunner/volumes/25mb` |
-| 50MB  | 52428800   | `/var/lib/jobrunner/volumes/50mb` |
+## Storage volumes
 
-## Makefile Targets
+Each job runs with its working directory set to its tier's volume.
 
-```bash
-make build         # Build server and CLI binaries
-make test          # Run all tests
-make lint          # Run golangci-lint
-make fmt           # Format Go source files
-make docker-build  # Build Docker images
-make docker-up     # Start containers
-make docker-down   # Stop containers
-```
+| Tier  | Bytes    | Default path                      |
+|-------|----------|-----------------------------------|
+| 10 MB | 10485760 | `/var/lib/jobrunner/volumes/10mb` |
+| 25 MB | 26214400 | `/var/lib/jobrunner/volumes/25mb` |
+| 50 MB | 52428800 | `/var/lib/jobrunner/volumes/50mb` |
 
-## Running Tests
+## Metrics
 
-```bash
-make test
-```
+Besides the Go and process metrics, GPU mode exports:
 
-Tests cover the store layer (SQLite CRUD), executor (command execution, cancellation, timeouts), API handlers (HTTP request/response), and job model/queue logic.
+| Metric                                      | Labels         | Meaning                                |
+|---------------------------------------------|----------------|----------------------------------------|
+| `gpu_runner_gpu_memory_free_mb`             | `gpu`, `model` | Free memory as of the last poll        |
+| `gpu_runner_gpu_memory_total_mb`            | `gpu`, `model` | Total memory                           |
+| `gpu_runner_gpu_healthy`                    | `gpu`          | 1 if healthy at the last poll          |
+| `gpu_runner_gpu_busy`                       | `gpu`          | 1 while running a job                  |
+| `gpu_runner_gpu_jobs_placed_total`          | `gpu`          | Jobs placed on each GPU                |
+| `gpu_runner_nvidia_smi_poll_seconds`        |                | Duration of each health poll           |
+| `gpu_runner_nvidia_smi_poll_failures_total` |                | Health polls that failed or timed out  |
 
 ## Configuration
 
-All configuration is done via environment variables. See [.env.example](.env.example) for a complete reference.
+All settings are environment variables. See [.env.example](.env.example) for the full list.
 
-### Key Configuration Options
+| Variable                    | Default                    | Description                                         |
+|-----------------------------|----------------------------|-----------------------------------------------------|
+| `SERVER_ADDRESS`            | `0.0.0.0`                  | Bind address                                        |
+| `SERVER_PORT`               | `8080`                     | Port                                                |
+| `SHUTDOWN_TOKEN`            |                            | Bearer token for `DELETE /server`                   |
+| `REDIS_ADDRESS`             | `redis:6379`               | Redis host:port                                     |
+| `REDIS_PASSWORD`            |                            | Redis password                                      |
+| `REDIS_DB`                  | `0`                        | Redis database                                      |
+| `REDIS_DIAL_TIMEOUT`        | `5s`                       | Connect timeout                                     |
+| `REDIS_READ_TIMEOUT`        | `3s`                       | Read timeout                                        |
+| `REDIS_WRITE_TIMEOUT`       | `3s`                       | Write timeout                                       |
+| `REDIS_MAX_RETRIES`         | `3`                        | Redis command retries                               |
+| `DATABASE_PATH`             | `/data/jobs.db`            | SQLite file                                         |
+| `WORKER_COUNT`              | `3`                        | CPU workers (CPU mode only)                         |
+| `WORKER_JOB_TIMEOUT`        | `30s`                      | Per-job timeout (both modes)                        |
+| `WORKER_QUEUE_CAPACITY`     | `10`                       | In-memory queue capacity                            |
+| `WORKER_RESULTS_BUFFER`     | `100`                      | Results channel buffer                              |
+| `STORAGE_VOLUME_{10,25,50}MB_PATH` | see above           | Storage tier paths                                  |
+| `GPU_ENABLED`               | `false`                    | Turn on GPU scheduling                              |
+| `NVIDIA_SMI_PATH`           | `nvidia-smi`               | Path to `nvidia-smi`                                |
+| `GPU_POLL_INTERVAL`         | `10s`                      | GPU health and free-memory poll (min `1s`)          |
+| `GPU_MEMORY_CHECK_INTERVAL` | `2s`                       | Per-job memory check (min `100ms`)                  |
+| `GPU_MEMORY_GRACE_CHECKS`   | `2`                        | Consecutive over-limit checks before a kill (min 1) |
+| `LOG_LEVEL`                 | `info`                     | `debug`, `info`, `warn`, `error`                    |
+| `LOG_DIR`                   | `~/log/gpu-runner`         | Server log directory                                |
+| `LOG_FILE`                  | `server.log`               | Server log file                                     |
+| `GPU_RUNNER_SERVER`         | `http://0.0.0.0:8080`      | Server URL used by the CLI                          |
 
-#### Server Configuration
-- `SERVER_ADDRESS` - Server bind address (default: `0.0.0.0`)
-- `SERVER_PORT` - Server port (default: `8080`)
-
-#### Redis Configuration
-- `REDIS_ADDRESS` - Redis server address (default: `redis:6379`)
-- `REDIS_PASSWORD` - Redis password (default: empty)
-- `REDIS_DB` - Redis database number (default: `0`)
-- `REDIS_DIAL_TIMEOUT` - Connection timeout (default: `5s`)
-- `REDIS_READ_TIMEOUT` - Read timeout (default: `3s`)
-- `REDIS_WRITE_TIMEOUT` - Write timeout (default: `3s`)
-- `REDIS_MAX_RETRIES` - Max retry attempts (default: `3`)
-
-#### Database Configuration
-- `DATABASE_PATH` - SQLite database path (default: `/data/jobs.db`)
-
-#### Worker Configuration
-- `WORKER_COUNT` - Number of concurrent workers (default: `3`)
-- `WORKER_JOB_TIMEOUT` - Job execution timeout (default: `30s`)
-- `WORKER_QUEUE_CAPACITY` - Internal queue capacity (default: `10`)
-- `WORKER_RESULTS_BUFFER` - Results channel buffer (default: `100`)
-
-#### Storage Configuration
-- `STORAGE_VOLUME_10MB_PATH` - Path for 10MB tier (default: `/var/lib/jobrunner/volumes/10mb`)
-- `STORAGE_VOLUME_25MB_PATH` - Path for 25MB tier (default: `/var/lib/jobrunner/volumes/25mb`)
-- `STORAGE_VOLUME_50MB_PATH` - Path for 50MB tier (default: `/var/lib/jobrunner/volumes/50mb`)
-
-#### Logger Configuration
-- `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, `error` (default: `info`)
-- `LOG_DIR` - Log directory path (default: `~/log/gpu-runner`)
-- `LOG_FILE` - Log file name (default: `server.log`)
-
-#### CLI Configuration
-- `GPU_RUNNER_SERVER` - Default server URL for CLI (default: `http://0.0.0.0:8080`)
-
-### Configuration Examples
-
-#### High-Throughput Setup
-```bash
-# .env file for high throughput
-WORKER_COUNT=10
-WORKER_JOB_TIMEOUT=5m
-WORKER_QUEUE_CAPACITY=50
-WORKER_RESULTS_BUFFER=200
-LOG_LEVEL=warn
-```
-
-#### Development Setup
-```bash
-# .env file for development
-SERVER_PORT=3000
-REDIS_ADDRESS=localhost:6379
-WORKER_COUNT=2
-LOG_LEVEL=debug
-```
-
-#### Production Setup
-```bash
-# .env file for production
-SERVER_ADDRESS=0.0.0.0
-SERVER_PORT=8080
-REDIS_ADDRESS=redis-cluster.production.svc:6379
-REDIS_PASSWORD=secure_password_here
-DATABASE_PATH=/mnt/persistent/jobs.db
-WORKER_COUNT=8
-WORKER_JOB_TIMEOUT=10m
-LOG_LEVEL=info
-LOG_DIR=/var/log/gpu-runner
-```
-
-## Testing Complex Jobs
-
-For a comprehensive list of complex job examples to test the runner, see [COMPLEX_JOBS_EXAMPLES.md](COMPLEX_JOBS_EXAMPLES.md).
-
-Example complex job submissions:
+## Development
 
 ```bash
-# Data processing pipeline
-gpucli submit --cmd "seq 1 100 > raw.txt && awk '{print \$1*2}' raw.txt > transformed.txt && cat transformed.txt | awk '{sum+=\$1} END {print sum}'" --storage 10485760
-
-# Concurrent processing
-gpucli submit --cmd "for i in {1..10}; do (echo 'Processing '\$i && sleep 1) & done; wait && echo 'Done'" --storage 10485760
-
-# Resource-intensive job
-gpucli submit --cmd "python3 -c 'import random; m = [[random.random() for _ in range(100)] for _ in range(100)]; print(sum(sum(r) for r in m))'" --storage 10485760
-
-# Job with retry logic
-gpucli submit --cmd "if [ \$((RANDOM % 2)) -eq 0 ]; then exit 0; else exit 1; fi" --storage 10485760 --maxRetries 5
+make build         # build bin/server and bin/gpucli
+make test          # go test ./...
+make lint          # golangci-lint
+make fmt           # gofmt
+make docker-build  # build images
+make docker-up     # start containers
+make docker-down   # stop containers
 ```
 
-## Deployment
+Tests never call the real `nvidia-smi`; the control plane, dispatcher, and memory enforcement are tested with fakes. CI (`.github/workflows/ci.yaml`) runs lint, tests, and a Docker build on every push and pull request to `main`.
 
-### Docker Compose Production Deployment
-
-1. Create a `.env` file with production settings
-2. Customize volume paths in `docker-compose.yml` if needed
-3. Deploy:
-
-```bash
-docker-compose up -d
-```
-
-### Kubernetes Deployment
-
-For Kubernetes deployment, you'll need to create:
-- `ConfigMap` or `Secret` for environment variables
-- `Deployment` for the server
-- `Service` to expose the HTTP API
-- `StatefulSet` for Redis (or use managed Redis)
-- `PersistentVolumeClaim` for database and job volumes
-
-Example partial manifest:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gpu-runner-config
-data:
-  SERVER_PORT: "8080"
-  REDIS_ADDRESS: "redis-service:6379"
-  WORKER_COUNT: "5"
-  WORKER_JOB_TIMEOUT: "60s"
-  LOG_LEVEL: "info"
-```
+More example jobs are in [COMPLEX_JOBS_EXAMPLES.md](COMPLEX_JOBS_EXAMPLES.md).
