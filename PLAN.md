@@ -366,6 +366,177 @@ The tie-break, and later the whole v2 scoring function, should be chosen with da
 7. Per-pool details in `/health`.
 8. The research spike and simulation harness, then fix the tie-break.
 
+## Multi-node: one central server, a worker on each GPU machine
+
+**Status: built** (branch `itai/central-server`). Tested locally with a central
+server and two GPU boxes; not yet run against the real vast.ai boxes.
+
+**Goal:** a single central server orchestrates every GPU, on any number of
+machines. **The worker is what runs on each GPU machine**: it reports its GPUs and runs the
+jobs it is sent. There is no queue, Redis, or scheduling on a GPU machine.
+
+### Shape
+
+```
+                     ┌──────────── central server (no GPU needed) ────────────┐
+ gpucli / HTTP ────▶ │ API ─▶ Redis (pending, processing, logs) ─▶ queue      │
+                     │                                              │ offers  │
+                     │ control plane ◀── slot table ◀── dispatcher ◀┘         │
+                     │   providers: [worker A, worker B, ...]                 │
+                     │ worker client per slot ── sends the job ──────┐        │
+                     └──────────────────────────▲────────────────────┼────────┘
+                          GET /gpus (poll)      │                    │ POST /run
+                     ┌──────────────────────────┴───┐   ┌────────────▼─────────┐
+                     │ worker on GPU box A (4090)   │   │ worker on box B      │
+                     │ nvidia-smi, run job, memory  │   │ (5090), same         │
+                     │ enforcement. Nothing else.   │   │                      │
+                     └──────────────────────────────┘   └──────────────────────┘
+```
+
+### What lives where
+
+| Component | Where | Change from today |
+|---|---|---|
+| API, Redis, job store, acknowledger | Central | None |
+| Queue (`internal/queue`), FIFO policy | Central | None |
+| Dispatcher | Central | None. It sees slots and inboxes; it doesn't care which machine a slot is on. |
+| Control plane + slot table | Central | Holds **several providers** (one per GPU machine) instead of one. Slots from every provider go into one slot table. |
+| `GPUProvider` (local `nvidia-smi`) | Central, single-machine mode only | Kept, so one machine still works with no remote worker. |
+| `box.Client` (new, `internal/box`) | Central | One per GPU box. It is a `Provider` (its `Poll` calls the box's `GET /gpus`) and it runs jobs on the box (`POST /run`) with the same signature as the local executor. |
+| **Worker (new, `cmd/worker`)** | **Each GPU machine** | **Runs the jobs.** Tiny HTTP server: report GPUs, run a job pinned to its GPU, enforce memory. This is the execution half of today's `Worker`. |
+| Worker client (one per slot) | Central | Today's `jobs.Worker` with `Run` set to the box's client: reads the slot's inbox, sends the job to the GPU box, then sets status, sends the result for ack/retry, and calls `Release`. `Parallel` runs each placed job in its own goroutine (see "Scheduling hand-off"). |
+
+### The worker (`cmd/worker`, on each GPU machine)
+
+Stateless. It reuses code we already have: `QueryGPUs`/`parseNvidiaSMI` and the
+executor with memory enforcement.
+
+| Endpoint | Does | Reuses |
+|---|---|---|
+| `GET /gpus` | Runs `nvidia-smi`, returns `[]Slot` | `QueryGPUs`, `parseNvidiaSMI` |
+| `POST /run` `{job_id, command, gpu_id, memory_mb}` | Runs the command with `CUDA_VISIBLE_DEVICES=<gpu_id>` and the memory watcher. The request stays open until the job ends, then returns `{output, error, memory_exceeded}`. | `Executor.RunJobWithEnv`, `NvidiaSMIMemoryProbe` |
+| `GET /health` | 200 if `nvidia-smi` works | |
+
+- **Cancel:** the worker client cancels its request context; the worker sees the
+  request close and kills the job's process group (the executor already does this
+  on context cancel).
+- **Logs:** the worker returns output and errors; the worker client writes them to
+  the job's Redis log stream as today. Live log streaming from the worker is later.
+- **Auth:** the worker runs arbitrary commands, so it must never be public. v1 of
+  multi-node binds it to `127.0.0.1` and the central server reaches it through an
+  SSH tunnel. A shared token is a later option.
+
+### Central server changes
+
+1. **Config:** `GPU_WORKERS=http://127.0.0.1:19000,http://127.0.0.1:19001` (one URL
+   per GPU machine). Empty means today's single-machine mode with the local `GPUProvider`.
+2. **Control plane, several providers:** `NewControlPlane` takes `[]Provider`.
+   Discovery polls each one; slot IDs are GPU UUIDs, which are globally unique, so
+   slots merge without clashes. The control plane remembers which provider owns
+   each slot.
+3. **Per-machine failure:** a worker that can't be reached marks **only its own** slots
+   unhealthy. Today one failed poll marks every slot unhealthy, which is right for
+   one machine but wrong for many.
+4. **Split today's `Worker`:** execution moves to `cmd/worker` on the GPU box; the
+   central worker client keeps the loop, status updates, retries, `NoRetry` on
+   memory kills, and `OnIdle → Release`. In single-machine mode the client runs the
+   job locally, as today.
+5. **Memory kill across the wire:** the worker reports `memory_exceeded` with used
+   and requested MB; the central side turns it back into `MemoryExceededError`, so
+   the API, CLI, and logs show the same message as today.
+
+### Failure cases
+
+| Case | Behaviour |
+|---|---|
+| GPU machine down at startup | Discovery runs once, so its worker is skipped and logged. Restart the central server to add it (see open question 2). |
+| GPU machine goes down while idle | Its slots turn unhealthy at the next poll; the dispatcher stops offering them. They come back when its worker answers again. |
+| GPU machine dies mid-job | The `POST /run` request fails; the worker client marks the job failed and the existing retry path re-runs it on any healthy GPU. |
+| Central server dies mid-job | Jobs stay in Redis `processing` and are requeued at restart (as today). The worker sees its request drop and kills the job. |
+
+### Why software on the GPU machine at all
+
+Only two things must physically happen on a GPU machine: reading its GPUs
+(`nvidia-smi` sees only local GPUs) and starting or killing the job's process.
+The worker does exactly those two things; everything else is central. This
+is the usual agent pattern (Slurm's `slurmd`, Kubernetes' `kubelet`, Ray's
+`raylet`), just smaller.
+
+**Alternative considered: SSH only, nothing installed on the GPU machine.** The central server would
+run `ssh <box> nvidia-smi ...` to poll and `ssh <box> '<command>'` to run jobs.
+Rejected because memory enforcement would have to poll and kill over SSH (slower,
+less reliable), and every poll would pay an SSH round trip. Fine for a demo, not
+for the design.
+
+### Not in scope
+
+- GPU machines joining or leaving without a central restart (needs registration and
+  re-discovery).
+- Several central servers.
+- Moving the job store off local SQLite (only the central server writes it, so
+  it is fine for now).
+
+### Implementation order
+
+1. ✅ `cmd/worker` and `internal/box`: `GET /gpus` and `POST /run`.
+2. ✅ The multi-provider control plane, with per-machine health.
+3. ✅ `Run` and `Parallel` on `jobs.Worker`; `GPU_WORKERS` wired in `cmd/server`.
+4. ✅ End-to-end locally: a central server plus two boxes on one Mac, each with its own fake `nvidia-smi`. Checked: discovery across boxes, oversized rejection, placement by memory, a memory kill on a box reported centrally without retry, one box down only hiding its own GPU, a box stopped or crashed mid-job with the job retried on the other box, and a 60-job load test (0 lost, ~80% busy on each GPU).
+5. Real test: central server on the Mac, workers on the two vast.ai boxes, reached through SSH tunnels.
+
+### Scheduling hand-off
+
+The execution path no longer assumes one job per GPU, so the queue and
+dispatcher can allocate by space:
+
+- Each placed job runs in its own goroutine on the central server, and a box runs
+  as many jobs at once as it is sent. **The dispatcher alone decides how many jobs
+  share a GPU.**
+- `Release(slotID, job)` already carries the job, so the dispatcher can return
+  just that job's memory.
+- What still assumes one job per GPU is the dispatcher's own bookkeeping:
+  `available` holds idle slots only, `Place` deletes the slot, and `Release`
+  puts the whole slot back. That is the part the scheduling work changes (e.g.
+  track reserved MB per slot and offer `free - reserved`).
+
+### Multi-node known limits (found while testing)
+
+- **A crashed worker orphans its jobs.** A normal stop (`SIGTERM`) kills the box's
+  running jobs, and the central server retries them elsewhere. A `kill -9` of the
+  worker process leaves its jobs running on the GPU, since nothing is left to kill
+  them. In production, run `cmd/worker` under systemd or in a container, which
+  kill the worker's whole process tree when it dies. A whole-machine crash is
+  fine: the jobs die with it.
+- **`max_retries` means maximum attempts**, not retries: `max_retries: 1` runs a
+  job once. (Pre-existing behaviour, unchanged.)
+- **Storage volumes stay central.** Jobs on a box run in its `WORKER_WORK_DIR`.
+- **No auth on the worker.** It listens on `127.0.0.1`; reach it through an SSH
+  tunnel.
+
+### Running it
+
+On each GPU box:
+
+```bash
+go build -o worker ./cmd/worker && ./worker      # listens on 127.0.0.1:19000
+```
+
+On the central machine, one SSH tunnel per box, then the server:
+
+```bash
+ssh -N -L 19000:127.0.0.1:19000 -p <port> root@<box A> &
+ssh -N -L 19001:127.0.0.1:19000 -p <port> root@<box B> &
+GPU_ENABLED=true GPU_WORKERS=http://127.0.0.1:19000,http://127.0.0.1:19001 go run ./cmd/server
+```
+
+### Open questions
+
+1. Should `POST /run` stay one long HTTP request per job, or should it return at
+   once and have the worker call back when the job ends? A long request is simplest;
+   a callback survives brief network drops.
+2. Should a worker that's down at startup be retried in the background instead of
+   needing a restart?
+
 ## v2: workers not tied to slots
 
 | v1 | v2 |

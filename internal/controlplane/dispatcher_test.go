@@ -14,11 +14,7 @@ func newTestDispatcher(t *testing.T, provider *fakeProvider) (*ControlPlane, *Di
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	table, err := DiscoverSlots(ctx, provider)
-	if err != nil {
-		t.Fatalf("DiscoverSlots failed: %v", err)
-	}
-	cp := &ControlPlane{provider: provider, slotTable: table, interval: time.Second}
+	cp := newCP(t, provider)
 	d := NewDispatcher(ctx, *cp)
 	d.Dispatch(ctx)
 	return cp, d

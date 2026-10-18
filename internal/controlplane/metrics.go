@@ -59,7 +59,7 @@ func (c *GPUCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	c.dispatcher.mu.Unlock()
 
-	for _, s := range c.cp.slotTable.Snapshot() {
+	for _, s := range c.cp.Snapshot() {
 		ch <- prometheus.MustNewConstMetric(memFreeDesc, prometheus.GaugeValue, float64(s.FreeMemoryMB), s.ID, s.Model)
 		ch <- prometheus.MustNewConstMetric(memTotalDesc, prometheus.GaugeValue, float64(s.TotalMemoryMB), s.ID, s.Model)
 		ch <- prometheus.MustNewConstMetric(healthyDesc, prometheus.GaugeValue, boolToFloat(s.Healthy), s.ID)

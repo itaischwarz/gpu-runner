@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -65,6 +66,9 @@ type GPUConfig struct {
 	// checks in a row, MemoryCheckInterval apart, is killed.
 	MemoryCheckInterval time.Duration
 	MemoryGraceChecks   int
+	// Workers are the GPU boxes' addresses, e.g. http://127.0.0.1:19000, each
+	// running cmd/worker. Empty means the GPUs are on this machine.
+	Workers []string
 }
 
 // LoggerConfig holds logging configuration
@@ -115,6 +119,7 @@ func Load() (*Config, error) {
 			PollInterval:  getEnvAsDuration("GPU_POLL_INTERVAL", 10*time.Second),
 			MemoryCheckInterval: getEnvAsDuration("GPU_MEMORY_CHECK_INTERVAL", 2*time.Second),
 			MemoryGraceChecks:   getEnvAsInt("GPU_MEMORY_GRACE_CHECKS", 2),
+			Workers:             getEnvAsList("GPU_WORKERS"),
 		},
 	}
 
@@ -162,6 +167,12 @@ func (c *Config) Validate() error {
 
 	if c.GPU.Enabled && c.GPU.MemoryGraceChecks < 1 {
 		return fmt.Errorf("GPU_MEMORY_GRACE_CHECKS must be at least 1, got %d", c.GPU.MemoryGraceChecks)
+	}
+
+	for _, w := range c.GPU.Workers {
+		if !strings.HasPrefix(w, "http://") && !strings.HasPrefix(w, "https://") {
+			return fmt.Errorf("GPU_WORKERS entries must be http(s) URLs, got %q", w)
+		}
 	}
 
 	return nil
@@ -218,4 +229,15 @@ func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 		return defaultValue
 	}
 	return value
+}
+
+// getEnvAsList splits a comma-separated variable, dropping empty entries.
+func getEnvAsList(key string) []string {
+	var out []string
+	for _, v := range strings.Split(os.Getenv(key), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }

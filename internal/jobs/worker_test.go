@@ -140,3 +140,67 @@ func TestWorkerKeepsUserCancelledJobCancelled(t *testing.T) {
 		t.Fatalf("expected cancelled and not retried, got status=%s noRetry=%v", got.Status, got.NoRetry)
 	}
 }
+
+func TestWorkerUsesRunInsteadOfLocalExecutor(t *testing.T) {
+	jq := NewJobQueue(1)
+	jq.Executor = executer.NewExecutor(10 * time.Second)
+	results := make(chan *Job, 1)
+	inbox := make(chan *Job, 1)
+
+	var gotEnv []string
+	w := NewWorker(1, jq, results)
+	w.Inbox = inbox
+	w.Env = []string{"CUDA_VISIBLE_DEVICES=GPU-remote"}
+	w.Run = func(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger, extraEnv []string, memoryLimitMB int) (string, error) {
+		gotEnv = extraEnv
+		return "ran remotely", nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.Start(ctx)
+
+	// "exit 1" would fail if it ran on this machine.
+	inbox <- newTestJob("remote", "exit 1")
+	if job := waitForResult(t, results); job.Status != StatusSuccess {
+		t.Fatalf("expected success from Run, got %s", job.Status)
+	}
+	if len(gotEnv) != 1 || gotEnv[0] != "CUDA_VISIBLE_DEVICES=GPU-remote" {
+		t.Errorf("expected Run to get the worker's Env, got %v", gotEnv)
+	}
+}
+
+func TestParallelWorkerRunsJobsAtTheSameTime(t *testing.T) {
+	jq := NewJobQueue(1)
+	jq.Executor = executer.NewExecutor(10 * time.Second)
+	results := make(chan *Job, 2)
+	inbox := make(chan *Job, 1)
+
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	w := NewWorker(1, jq, results)
+	w.Inbox = inbox
+	w.Parallel = true
+	w.Run = func(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger, extraEnv []string, memoryLimitMB int) (string, error) {
+		started <- struct{}{}
+		<-release // both jobs must be running before either may finish
+		return "", nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w.Start(ctx)
+
+	inbox <- newTestJob("a", "true")
+	inbox <- newTestJob("b", "true")
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("second job did not start while the first was running")
+		}
+	}
+	close(release)
+	waitForResult(t, results)
+	waitForResult(t, results)
+}
