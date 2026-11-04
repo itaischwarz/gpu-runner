@@ -1,3 +1,12 @@
-.env 
-**/~
-gpucli
+.env
+.DS_Store
+
+# Build output
+/bin/
+/gpucli
+/main
+/server
+
+# Local data and logs
+*.db
+**/~/
