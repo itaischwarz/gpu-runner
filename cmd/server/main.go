@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"gpu-runner/internal/api"
+	"gpu-runner/internal/box"
 	"gpu-runner/internal/config"
 	"gpu-runner/internal/controlplane"
 	"gpu-runner/internal/executer"
@@ -49,8 +50,19 @@ func main() {
 
 	var cp *controlplane.ControlPlane
 	if cfg.GPU.Enabled {
-		serverLogger.Info("Initializing control plane", "nvidia_smi_path", cfg.GPU.NvidiaSMIPath, "poll_interval", cfg.GPU.PollInterval)
-		cp, err = controlplane.NewControlPlane(ctx, cfg.GPU.NvidiaSMIPath, cfg.GPU.PollInterval)
+		// The GPUs are either on remote boxes (GPU_WORKERS), each running
+		// cmd/worker, or on this machine.
+		var providers []controlplane.Provider
+		if len(cfg.GPU.Workers) > 0 {
+			for _, url := range cfg.GPU.Workers {
+				providers = append(providers, box.New(url))
+			}
+			serverLogger.Info("Initializing control plane for GPU boxes", "workers", cfg.GPU.Workers, "poll_interval", cfg.GPU.PollInterval)
+		} else {
+			providers = append(providers, controlplane.NewGPUProvider(cfg.GPU.NvidiaSMIPath))
+			serverLogger.Info("Initializing control plane for local GPUs", "nvidia_smi_path", cfg.GPU.NvidiaSMIPath, "poll_interval", cfg.GPU.PollInterval)
+		}
+		cp, err = controlplane.NewControlPlane(ctx, cfg.GPU.PollInterval, providers...)
 		if err != nil {
 			serverLogger.Error("Failed to initialize control plane", "error", err)
 			log.Fatalf("Failed to initialize control plane: %v", err)
@@ -94,19 +106,24 @@ func main() {
 	var intake chan<- *jobs.Job
 
 	if cfg.GPU.Enabled {
-		// Kill jobs that use more GPU memory than they requested.
-		jobQueue.Executor.SetMemoryLimits(
-			executer.NvidiaSMIMemoryProbe(cfg.GPU.NvidiaSMIPath),
-			cfg.GPU.MemoryCheckInterval,
-			cfg.GPU.MemoryGraceChecks,
-		)
-		serverLogger.Info("GPU memory limits enforced", "check_interval", cfg.GPU.MemoryCheckInterval, "grace_checks", cfg.GPU.MemoryGraceChecks)
+		// Kill jobs that use more GPU memory than they requested. On GPU boxes,
+		// each box's worker does this itself.
+		if len(cfg.GPU.Workers) == 0 {
+			jobQueue.Executor.SetMemoryLimits(
+				executer.NvidiaSMIMemoryProbe(cfg.GPU.NvidiaSMIPath),
+				cfg.GPU.MemoryCheckInterval,
+				cfg.GPU.MemoryGraceChecks,
+			)
+			serverLogger.Info("GPU memory limits enforced", "check_interval", cfg.GPU.MemoryCheckInterval, "grace_checks", cfg.GPU.MemoryGraceChecks)
+		}
 
 		dispatcher := controlplane.NewDispatcher(ctx, *cp)
 		jobQ := queue.New(dispatcher, queue.FIFO{}, cfg.Worker.QueueCapacity, cfg.GPU.PollInterval)
 
 		// One worker per GPU, started before the queue so every inbox has a
-		// reader before the first Place.
+		// reader before the first Place. Each placed job runs in its own
+		// goroutine, so the dispatcher alone decides how many share a GPU. A
+		// GPU on a box runs its jobs there; a local GPU runs them here.
 		inboxes := dispatcher.Inbox()
 		slotIDs := make([]string, 0, len(inboxes))
 		for id := range inboxes {
@@ -116,13 +133,20 @@ func main() {
 		for i, slotID := range slotIDs {
 			worker := jobs.NewWorker(i+1, jobQueue, results)
 			worker.Inbox = inboxes[slotID]
-			worker.Env = []string{"CUDA_VISIBLE_DEVICES=" + slotID}
+			provider := cp.ProviderFor(slotID)
+			worker.Env = provider.Env(slotID)
+			worker.Parallel = true
+			where := "local"
+			if b, ok := provider.(*box.Client); ok {
+				worker.Run = b.RunJobWithEnv
+				where = b.URL()
+			}
 			worker.OnIdle = func(job *jobs.Job) {
 				dispatcher.Release(slotID, job)
 				jobQ.Wake()
 			}
 			worker.Start(ctx)
-			serverLogger.Info("Started GPU worker", "worker_id", i+1, "slot_id", slotID)
+			serverLogger.Info("Started GPU worker", "worker_id", i+1, "slot_id", slotID, "runs_on", where)
 		}
 
 		if err := dispatcher.Start(ctx); err != nil {

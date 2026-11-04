@@ -191,9 +191,36 @@ func clearEnvVars() {
 		"STORAGE_VOLUME_10MB_PATH", "STORAGE_VOLUME_25MB_PATH", "STORAGE_VOLUME_50MB_PATH",
 		"LOG_LEVEL", "LOG_DIR", "LOG_FILE",
 		"GPU_ENABLED", "NVIDIA_SMI_PATH", "GPU_POLL_INTERVAL",
-		"GPU_MEMORY_CHECK_INTERVAL", "GPU_MEMORY_GRACE_CHECKS",
+		"GPU_MEMORY_CHECK_INTERVAL", "GPU_MEMORY_GRACE_CHECKS", "GPU_WORKERS",
 	}
 	for _, v := range vars {
 		_ = os.Unsetenv(v)
+	}
+}
+
+func TestLoad_GPUWorkers(t *testing.T) {
+	clearEnvVars()
+	defer clearEnvVars()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if len(cfg.GPU.Workers) != 0 {
+		t.Errorf("expected no GPU workers by default, got %v", cfg.GPU.Workers)
+	}
+
+	t.Setenv("GPU_WORKERS", " http://127.0.0.1:19000, ,http://127.0.0.1:19001 ")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if len(cfg.GPU.Workers) != 2 || cfg.GPU.Workers[0] != "http://127.0.0.1:19000" || cfg.GPU.Workers[1] != "http://127.0.0.1:19001" {
+		t.Errorf("unexpected GPU workers: %v", cfg.GPU.Workers)
+	}
+
+	t.Setenv("GPU_WORKERS", "127.0.0.1:19000")
+	if _, err := Load(); err == nil {
+		t.Error("expected an error for a GPU worker address without http://")
 	}
 }

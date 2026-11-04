@@ -51,7 +51,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 	if err := d.controlplane.Health(ctx); err != nil {
 		return fmt.Errorf("dispatcher: control plane not ready: %w", err)
 	}
-	for _, s := range d.controlplane.slotTable.slots {
+	for _, s := range d.controlplane.Snapshot() {
 		if _, ok := d.inboxes[s.ID]; !ok {
 			return fmt.Errorf("dispatcher: slot %s has no worker inbox", s.ID)
 		}
@@ -71,7 +71,7 @@ func NewDispatcher(ctx context.Context, cp ControlPlane) *Dispatcher {
 	// a GPU that recovers is offered again.
 	available := make(map[string]int)
 	inboxes := make(map[string] chan *jobs.Job)
-	for _, s := range cp.slotTable.Snapshot() {
+	for _, s := range cp.Snapshot() {
 		available[s.ID] = free[s.ID]
 		inboxes[s.ID] = make(chan *jobs.Job, 1)
 	}

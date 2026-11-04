@@ -1,6 +1,64 @@
 # gpu-runner
 
-A job runner that executes shell commands on CPU workers or on NVIDIA GPUs. Jobs are queued in Redis, stored in SQLite, retried on failure, and, in GPU mode, scheduled onto GPUs by free memory, with a hard limit on how much GPU memory each job may use.
+[![CI](https://github.com/itaischwarz/gpu-runner/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/itaischwarz/gpu-runner/actions/workflows/ci.yaml)
+
+A GPU job scheduler written in Go. You submit a command and how much GPU memory it needs; a central server places it on a GPU with room, on any of several machines, enforces the memory limit while it runs, and retries it if a machine fails.
+
+## Highlights
+
+- **Memory-aware placement across machines.** One central control plane tracks every GPU on every box. Jobs go to the smallest GPU that fits, so large GPUs stay free for large jobs.
+- **Enforced memory limits.** Consumer GPUs have no per-process memory isolation (NVIDIA's MIG is datacenter-only), so a job that keeps using more than it asked for is killed — its whole process group — and not retried. That makes every request a guarantee the scheduler can rely on.
+- **No lost jobs.** Redis `BRPOPLPUSH` keeps an in-flight copy of every job; work left behind by a crashed server is requeued at startup, and a job on a box that dies is retried on another GPU.
+- **Failure isolation.** An unreachable GPU box only takes its own GPUs out of rotation; they come back when it answers again.
+- **Observable.** Prometheus metrics for per-GPU free memory, health, busy state, placements, poll latency, and memory kills.
+- **Tested.** Unit tests with the race detector (fakes for `nvidia-smi`, Redis-backed tests, an in-process GPU box), plus load, crash, and real-GPU test scripts.
+
+## Results
+
+| Test | Setup | Result |
+|---|---|---|
+| Load test, 200 jobs | 4 simulated GPUs (2 × 80 GB, 2 × 24 GB) | 200/200 succeeded, 0 lost, ~90% GPU busy time |
+| Real GPUs | RTX 4090 (48 GB) and RTX 5090 (32 GB), one box each | 80% and 84% GPU busy time under load |
+| Server crash | `kill -9` with jobs in flight, then restart | Unfinished jobs requeued and re-run, 0 lost |
+| Multi-node | Central server + 2 GPU boxes (simulated on one machine) | Placement by memory across boxes; a box stopped or crashed mid-job had its job retried on the other; 60-job load test with 0 lost |
+
+Reproduce with [`scripts/loadtest`](scripts/loadtest) (simulated GPUs, add `crash` for the crash test) and [`scripts/gputest`](scripts/gputest) (run on a real GPU machine).
+
+## Architecture
+
+```
+                 ┌──────────────── central server (no GPU needed) ────────────────┐
+ gpucli / HTTP ─►│ API ─► Redis (pending → processing, job logs) ─► queue (FIFO)  │
+                 │  │                                                │ offers    │
+                 │  └► SQLite ◄─ acknowledger ◄─ results    dispatcher ◄┘          │
+                 │                       ▲                     ▲  │ places job    │
+                 │                       │       control plane ┘  ▼               │
+                 │                       └──────────────── worker per GPU          │
+                 └──────────────────────────────▲─────────────────┬───────────────┘
+                                 GET /gpus (poll)│                 │POST /run
+                 ┌──────────────────────────────┴──┐  ┌───────────▼─────────────┐
+                 │ GPU box: cmd/worker             │  │ GPU box: cmd/worker     │
+                 │ nvidia-smi, runs jobs, enforces │  │ ...                     │
+                 │ memory limits                   │  │                         │
+                 └─────────────────────────────────┘  └─────────────────────────┘
+```
+
+Without `GPU_WORKERS`, the same server schedules the GPUs on its own machine, and with `GPU_ENABLED=false` it runs jobs on CPU workers.
+
+## Design decisions
+
+- **Pull-based scheduling.** The queue asks the dispatcher which GPUs can take a job of a given size and places it; the dispatcher never calls the queue. A job that fits nowhere yet waits without blocking smaller jobs behind it.
+- **One scheduler, pluggable infrastructure.** The control plane only sees a `Provider` interface. Local GPUs (`nvidia-smi`), remote GPU boxes (HTTP), and fake GPUs in tests are all providers, so the scheduling code never changes.
+- **A thin agent on each GPU box.** Only two things must happen on the GPU machine: reading its GPUs and starting or killing processes. `cmd/worker` does just that; queueing, scheduling, retries, and state are central. Cancelling a job closes its HTTP request, and the box kills the job's process group.
+- **Kill the process group, not the process.** Jobs run as `bash -c`, and the GPU work usually runs in a child, so each job gets its own process group and the whole group is killed.
+
+See [PLAN.md](PLAN.md) for the full design, trade-offs, and roadmap.
+
+## Limitations and roadmap
+
+- One job per GPU today. Next: share GPUs by reserved memory, and backfilling — reserve the GPU expected to free up first for a large waiting job, while smaller jobs fill the gaps.
+- Memory enforcement relies on `nvidia-smi` seeing per-process usage, which some containers hide.
+- The GPU box agent has no authentication; it listens on `127.0.0.1` and is reached through an SSH tunnel.
 
 ## How it works
 
@@ -12,7 +70,8 @@ gpucli / HTTP ─► API ─► Redis (pending → processing) ─► Redis adap
   CPU mode (GPU_ENABLED=false):  WORKER_COUNT workers share one in-memory queue
   GPU mode (GPU_ENABLED=true):   queue (FIFO) ─► dispatcher ─► one worker per GPU
                                                      ▲
-                                 control plane ── polls nvidia-smi
+                                 control plane ── polls nvidia-smi (local),
+                                                   or each GPU box (GPU_WORKERS)
 ```
 
 - **API** (`internal/api`): gorilla/mux HTTP server for submitting, listing, inspecting, and cancelling jobs, plus `/health` and Prometheus `/metrics`.
@@ -32,6 +91,22 @@ When `GPU_ENABLED=true`:
 - **One worker per GPU.** Each job sees only its GPU, through `CUDA_VISIBLE_DEVICES=<gpu uuid>`.
 - **Fail fast:** a job asking for more memory than the largest GPU is rejected with a 400 when submitted.
 - **Memory enforcement:** every `GPU_MEMORY_CHECK_INTERVAL`, a running job's GPU memory is measured per process group (`nvidia-smi --query-compute-apps`). If it stays above `memory_mb` for `GPU_MEMORY_GRACE_CHECKS` checks in a row, the whole process group is killed, and the job fails with an `exceeded memory request` error and is **not retried**.
+
+### Multiple GPU machines
+
+Set `GPU_WORKERS` to run the central server against GPU boxes instead of local GPUs. Each box runs `cmd/worker`, which listens on `127.0.0.1:19000`; reach it through an SSH tunnel:
+
+```bash
+# On each GPU box
+go build -o worker ./cmd/worker && ./worker
+
+# On the central machine: one tunnel per box, then the server
+ssh -N -L 19000:127.0.0.1:19000 root@<box-a> &
+ssh -N -L 19001:127.0.0.1:19000 root@<box-b> &
+GPU_ENABLED=true GPU_WORKERS=http://127.0.0.1:19000,http://127.0.0.1:19001 ./bin/server
+```
+
+Memory limits are then enforced on each box (`GPU_MEMORY_CHECK_INTERVAL`, `GPU_MEMORY_GRACE_CHECKS`, `WORKER_WORK_DIR` on the box), and the central machine needs no `nvidia-smi`.
 
 Frameworks that reserve GPU memory up front (JAX takes ~75% by default, and PyTorch's caching allocator holds on to freed memory) must be capped (for example with `XLA_PYTHON_CLIENT_MEM_FRACTION`) or given a large enough `memory_mb`. Otherwise they will be killed.
 
@@ -146,6 +221,7 @@ Besides the Go and process metrics, GPU mode exports:
 | `gpu_runner_gpu_jobs_placed_total`          | `gpu`          | Jobs placed on each GPU                |
 | `gpu_runner_nvidia_smi_poll_seconds`        |                | Duration of each health poll           |
 | `gpu_runner_nvidia_smi_poll_failures_total` |                | Health polls that failed or timed out  |
+| `gpu_runner_gpu_memory_kills_total`         |                | Jobs killed for exceeding their memory request (local GPUs) |
 
 ## Configuration
 
@@ -174,6 +250,7 @@ All settings are environment variables. See [.env.example](.env.example) for the
 | `GPU_POLL_INTERVAL`         | `10s`                      | GPU health and free-memory poll (min `1s`)          |
 | `GPU_MEMORY_CHECK_INTERVAL` | `2s`                       | Per-job memory check (min `100ms`)                  |
 | `GPU_MEMORY_GRACE_CHECKS`   | `2`                        | Consecutive over-limit checks before a kill (min 1) |
+| `GPU_WORKERS`               |                            | Comma-separated GPU box URLs; empty means local GPUs |
 | `LOG_LEVEL`                 | `info`                     | `debug`, `info`, `warn`, `error`                    |
 | `LOG_DIR`                   | `~/log/gpu-runner`         | Server log directory                                |
 | `LOG_FILE`                  | `server.log`               | Server log file                                     |
@@ -191,6 +268,12 @@ make docker-up     # start containers
 make docker-down   # stop containers
 ```
 
-Tests never call the real `nvidia-smi`; the control plane, dispatcher, and memory enforcement are tested with fakes. CI (`.github/workflows/ci.yaml`) runs lint, tests, and a Docker build on every push and pull request to `main`.
+Tests never call the real `nvidia-smi`; the control plane, dispatcher, and memory enforcement are tested with fakes, and the GPU box client and server are tested against each other in-process.
+
+```bash
+scripts/loadtest/run.sh          # load test on 4 simulated GPUs (needs local Redis)
+scripts/loadtest/run.sh crash    # same, with a kill -9 of the server mid-run
+bash scripts/gputest/run.sh      # on a real GPU machine: discovery, pinning, memory kill, load
+``` CI (`.github/workflows/ci.yaml`) runs lint, tests, and a Docker build on every push and pull request to `main`.
 
 More example jobs are in [COMPLEX_JOBS_EXAMPLES.md](COMPLEX_JOBS_EXAMPLES.md).

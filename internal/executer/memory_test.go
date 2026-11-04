@@ -62,10 +62,44 @@ func TestJobOverMemoryLimitIsKilledWithChildren(t *testing.T) {
 		t.Fatalf("child pid not written: %v", readErr)
 	}
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-	if syscall.Kill(pid, 0) == nil {
+	if !waitForExit(pid, 2*time.Second) {
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 		t.Error("child process survived the kill")
 	}
+}
+
+// waitForExit reports whether pid is gone within timeout. SIGKILL is not
+// instant, and a killed child of bash is reparented and lingers as a zombie
+// until its new parent reaps it, which can be slow (e.g. in CI containers).
+// A zombie is already dead, so it counts as gone.
+func waitForExit(pid int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if !processAlive(pid) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func processAlive(pid int) bool {
+	if syscall.Kill(pid, 0) != nil {
+		return false
+	}
+	// On Linux, /proc/<pid>/stat is "pid (comm) state ..."; state Z is a
+	// zombie. Elsewhere there is no /proc, and kill(pid, 0) is the answer.
+	stat, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return true
+	}
+	s := string(stat)
+	if i := strings.LastIndexByte(s, ')'); i >= 0 && i+2 < len(s) {
+		return s[i+2] != 'Z'
+	}
+	return true
 }
 
 func TestJobUnderMemoryLimitCompletes(t *testing.T) {

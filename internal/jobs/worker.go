@@ -10,13 +10,22 @@ import (
 
 var workerLogger = logger.Server
 
+// RunFunc runs one job's command and returns its output. The local executor's
+// RunJobWithEnv and box.Client's are both RunFuncs.
+type RunFunc func(command, jobID, volumePath string, ctx context.Context, jobLogger logger.JobLogger, extraEnv []string, memoryLimitMB int) (string, error)
+
 type Worker struct {
 	ID       int
-	JobQueue *JobQueue // still provides the Executor
+	JobQueue *JobQueue // provides the Executor: job timeout and cancel registry
 	Results  chan *Job
 	Inbox    <-chan *Job // where jobs arrive; defaults to JobQueue.Queue
 	Env      []string    // extra env for every job, e.g. CUDA_VISIBLE_DEVICES=<uuid>
 	OnIdle   func(*Job)  // called after each job with that job, e.g. to release the GPU slot
+	Run      RunFunc     // how jobs run; defaults to JobQueue.Executor.RunJobWithEnv (this machine)
+	// Parallel runs each job from Inbox in its own goroutine instead of one at
+	// a time. GPU workers set it so the dispatcher alone decides how many jobs
+	// share a slot; a full inbox would otherwise block Place.
+	Parallel bool
 }
 
 // NewWorker creates a worker that reads the shared JobQueue. GPU workers
@@ -54,51 +63,68 @@ func (w *Worker) Start(ctx context.Context) {
 					workerLogger.Info("Worker inbox closed, shutting down", "worker_id", w.ID)
 					return
 				}
-				job.Status = StatusRunning
-				workerLogger.Info("Worker received job from queue", "worker_id", w.ID, "job_id", job.ID, "status", job.Status)
-				job.Logger.Info("Job Running", logger.Item("Job Status", job.Status), logger.Item("worker", w.ID), logger.Item("command", job.Command))
-				volumePath := VolumePaths[job.StorageBytes]
-				jobTimeout := w.JobQueue.Executor.GetJobTimeout()
-				jobCtx, cancel := context.WithTimeout(ctx, jobTimeout)
-				workerLogger.Info("Setting up job execution context", "worker_id", w.ID, "job_id", job.ID, "volume_path", volumePath, "timeout", jobTimeout)
-
-				w.JobQueue.Executor.SetCancelFunc(job.ID, cancel)
-
-				workerLogger.Info("Executing job command", "worker_id", w.ID, "job_id", job.ID)
-				output, err := w.JobQueue.Executor.RunJobWithEnv(job.Command, job.ID, volumePath, jobCtx, *job.Logger, w.Env, job.MemoryMB)
-				// Read before cancel(): afterwards jobCtx always reports Canceled.
-				userCancelled := errors.Is(jobCtx.Err(), context.Canceled)
-				cancel()
-
-				if err != nil {
-					job.Status = StatusFailed
-					job.Error = err.Error()
-					var memErr *executer.MemoryExceededError
-					if errors.As(err, &memErr) {
-						job.NoRetry = true
-					}
-					if userCancelled {
-						// Cancelled by the user: keep it cancelled, don't retry.
-						job.Status = StatusCancelled
-						job.NoRetry = true
-					}
-					workerLogger.Error("Job execution failed", "worker_id", w.ID, "job_id", job.ID, "error", err)
-					job.Logger.Error("Job did not complete successfully",
-						logger.Item("error", err.Error()),
-						logger.Item("volume_path", volumePath),
-						logger.Item("job_id", job.ID),
-					)
-					w.finish(job)
-					continue
+				if w.Parallel {
+					go w.handle(ctx, job)
+				} else {
+					w.handle(ctx, job)
 				}
-
-				workerLogger.Info("Job execution completed successfully", "worker_id", w.ID, "job_id", job.ID, "output_length", len(output))
-				time.Sleep(1 * time.Second)
-				job.Status = StatusSuccess
-				job.Error = ""
-				job.Logger.Info("Completed job", logger.Item("status", job.Status), logger.Item("worker_id", w.ID), logger.Item("command", job.Command))
-				w.finish(job)
 			}
 		}
 	}()
+}
+
+// handle runs one job and reports how it ended.
+func (w *Worker) handle(ctx context.Context, job *Job) {
+	job.Status = StatusRunning
+	workerLogger.Info("Worker received job from queue", "worker_id", w.ID, "job_id", job.ID, "status", job.Status)
+	job.Logger.Info("Job Running", logger.Item("Job Status", job.Status), logger.Item("worker", w.ID), logger.Item("command", job.Command))
+	volumePath := VolumePaths[job.StorageBytes]
+	jobTimeout := w.JobQueue.Executor.GetJobTimeout()
+	jobCtx, cancel := context.WithTimeout(ctx, jobTimeout)
+	workerLogger.Info("Setting up job execution context", "worker_id", w.ID, "job_id", job.ID, "volume_path", volumePath, "timeout", jobTimeout)
+
+	w.JobQueue.Executor.SetCancelFunc(job.ID, cancel)
+
+	workerLogger.Info("Executing job command", "worker_id", w.ID, "job_id", job.ID)
+	output, err := w.runFunc()(job.Command, job.ID, volumePath, jobCtx, *job.Logger, w.Env, job.MemoryMB)
+	// Read before cancel(): afterwards jobCtx always reports Canceled.
+	userCancelled := errors.Is(jobCtx.Err(), context.Canceled)
+	cancel()
+
+	if err != nil {
+		job.Status = StatusFailed
+		job.Error = err.Error()
+		var memErr *executer.MemoryExceededError
+		if errors.As(err, &memErr) {
+			job.NoRetry = true
+		}
+		if userCancelled {
+			// Cancelled by the user: keep it cancelled, don't retry.
+			job.Status = StatusCancelled
+			job.NoRetry = true
+		}
+		workerLogger.Error("Job execution failed", "worker_id", w.ID, "job_id", job.ID, "error", err)
+		job.Logger.Error("Job did not complete successfully",
+			logger.Item("error", err.Error()),
+			logger.Item("volume_path", volumePath),
+			logger.Item("job_id", job.ID),
+		)
+		w.finish(job)
+		return
+	}
+
+	workerLogger.Info("Job execution completed successfully", "worker_id", w.ID, "job_id", job.ID, "output_length", len(output))
+	time.Sleep(1 * time.Second)
+	job.Status = StatusSuccess
+	job.Error = ""
+	job.Logger.Info("Completed job", logger.Item("status", job.Status), logger.Item("worker_id", w.ID), logger.Item("command", job.Command))
+	w.finish(job)
+}
+
+// runFunc returns how this worker runs jobs: Run if set, else this machine.
+func (w *Worker) runFunc() RunFunc {
+	if w.Run != nil {
+		return w.Run
+	}
+	return w.JobQueue.Executor.RunJobWithEnv
 }
